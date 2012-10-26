@@ -1,0 +1,10 @@
+include MANIFEST.in
+include LICENSE
+include README
+include AUTHORS
+include setup.py
+include setup.cfg
+recursive-include lapels *.py *.txt
+recursive-include modtools *.py *.txt
+recursive-include examples *.py *.txt
+recursive-include bin *

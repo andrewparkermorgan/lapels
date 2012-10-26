@@ -1,0 +1,105 @@
+Introduction
+============
+
+Lapels remaps reads aligned to the in silico genome back to the reference 
+coordinate and annotates variants.
+
+Two files are taken as input:
+    (1) a MOD file that is used to generate the in silico genome and
+    (2) a BAM file that contains the in silico genome alignments.
+    
+Lapels will generate a new BAM file with corrected read positions, adjusted 
+cigar strings, and annotated tags of variants (eg. SNPs, Insertions, and 
+Deletions).  
+
+
+For detail usage, please type after installation:
+
+    pylapels -h
+
+
+
+System Requirements
+===================
+Lapels and its modules have been tested under Python 2.6.5 and 2.7
+
+Several python modules are required to run the code.
+
+* [pysam >= 0.6]
+
+As a wrapper of Samtools, the pysam module facilitates the manipulation of 
+SAM/BAM files in Python. Its latest package can be downloaded from:
+http://code.google.com/p/pysam/
+
+The current pysam (v0.6) has been reported to have a bug in dealing with 
+integer tags. (http://code.google.com/p/pysam/issues/detail?id=101)
+
+A fixed version is provided below.
+http://www.csbio.unc.edu/~sphuang/pysam/pysam-0.6-devel.tar.gz
+
+
+* [argparse >= 1.2]
+
+The argparse module is used to parse the arguments of the module. It has been 
+maintained in Python Standard Library since Python 2.7. It can be found in:
+http://code.google.com/p/argparse/ .
+
+
+
+Installation
+============
+
+It is recommended to use easy-install 
+(http://packages.python.org/distribute/easy_install.html) for the installation.
+
+Users need to download the tarball of source from
+
+    http://code.google.com/p/lapels/
+    
+and then type:
+
+    easy_install Lapels-<version>.tar.gz
+    
+By default, the package will be installed under the directory of Python
+dist-packages, and the executable of pylapels can be found under 
+/usr/local/bin/ . 
+
+
+ 
+Example
+=======
+
+Examples can be downloaded from
+
+    http://code.google.com/p/lapels/
+    
+To run on the example files, type:
+
+    pylapels examples/example.mod examples/example.bam
+    
+
+The following is the content in the input and output BAM file in the example
+(the sequence and mapping quality are omitted).
+
+input:
+    UNC9-SN296_0254:3:1305:8580:174183#TGACCA   163 chr2    6361064 255 100M    =   6361092 128 <SEQ>    <MAPQ>    NM:i:1  NH:i:1
+    UNC9-SN296_0254:3:1305:8580:174183#TGACCA   83  chr2    6361092 255 100M    =   6361064 -128    <SEQ>    <MAPQ>    NM:i:1  NH:i:1
+
+output:
+    UNC9-SN296_0254:3:1305:8580:174183#TGACCA   163 chr2    6363700 255 35M7D63M1I1M    =   6363728 134 <SEQ>    <MAPQ>    NH:i:1  OC:Z:100M   OM:i:1  d0:i:7  i0:i:1  s0:i:1
+    UNC9-SN296_0254:3:1305:8580:174183#TGACCA   83  chr2    6363728 255 7M7D63M1I29M    =   6363700 -134    <SEQ>    <MAPQ>    NH:i:1  OC:Z:100M   OM:i:1  d0:i:7  i0:i:1  s0:i:1
+
+
+In the output, read positions and cigar strings are in the reference coordinate. 
+The length of each read(template) and the mate position (if any) has been 
+updated. 
+
+New tags have been added for each read. The default tags and their meaning are 
+shown below:
+
+    OC : the old cigar in the alignment of the in silico genome 
+    OM : the old NM (edit distance to the in silico sequence)
+    s0 : the number of observed SNP positions having the in silico alleles
+    i0 : the number of bases in the observed insertions having in silico alleles
+    d0 : the number of bases in the observed deletions having in silico alleles
+ 

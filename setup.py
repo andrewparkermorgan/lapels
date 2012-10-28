@@ -18,7 +18,8 @@ setup(
     platforms=['Linux',],    
     packages = ['lapels', 'lapels.tests', 'modtools', 'modtools.tests'],
     scripts = ['lapels/scripts/pylapels',],
-    install_requires = ['pysam>=0.6', 'argparse>=1.2'],    
+    install_requires = ['pysam>=0.6b', 'argparse>=1.2'],
+    dependency_links = ['http://lapels.googlecode.com/files/pysam-0.6b.tar.gz',],    
     keywords = 'lapels remap position bam mod',
     long_description='''
 Lapels remaps reads aligned to the in silico genome back to the reference 

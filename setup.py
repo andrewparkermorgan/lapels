@@ -17,7 +17,7 @@ setup(
     license='The MIT License',    
     platforms=['Linux',],    
     packages = ['lapels', 'lapels.tests', 'modtools', 'modtools.tests'],
-    scripts = ['lapels/scripts/pylapels',],
+    scripts = ['lapels/scripts/pylapels','modtools/scripts/vcf2mod'],
     install_requires = ['pysam>=0.6b', 'argparse>=1.2'],
     dependency_links = ['http://lapels.googlecode.com/files/pysam-0.6b.tar.gz',],    
     keywords = 'lapels remap position bam mod',

@@ -1,0 +1,176 @@
+#! /bin/env python 
+'''
+Created on Oct 28, 2012
+
+@author: Shunping Huang
+'''
+
+import os
+import pysam
+import gzip
+import csv
+import gc
+import sys
+import argparse
+from time import localtime, strftime
+
+from modtools import vcfreader as vcf
+from modtools.variants import parseVariant, SUB, INS, DEL
+
+DESC = 'A VCF to MOD converter.'
+__version__ = '0.0.1'
+VERBOSITY = 1
+
+chromMap = dict([(str(i), 'chr'+str(i)) for i in range(20)] + 
+                [('X', 'chrX'), ('Y', 'chrY'), 
+                 ('M', 'chrM'), ('MT',' chrM')])
+                
+
+infiles = ["../../data/indels.chr1_2.vcf.gz", "../../data/snps.chr1_2.vcf.gz"]
+outfile = "./test.mod"
+ref = 'mm9'
+sample = 'A_J'
+chroms = []
+
+
+def csvChromList(s):
+    delchars = ''.join(c for c in map(chr, range(256)) if not c.isdigit())    
+    chroms = set()
+    for tmp in s.split(','):
+        chrom = tmp[:-1].translate(None, delchars)+tmp[-1]
+        chroms.add(chrom)            
+    return chroms
+
+
+def log(s, verbosity=2, showtime=False):     
+    if verbosity == 1:
+        if showtime:
+            msg = "[%s] %s" % (strftime("%Y/%m/%d %H:%M:%S", localtime()), s)
+        else:
+            msg = s
+        sys.stdout.write(msg)
+        sys.stdout.flush()
+    elif verbosity > 1:
+        if showtime:
+            msg = "[%s] %s" % (strftime("%Y/%m/%d %H:%M:%S", localtime()), s)
+        else:
+            msg = s
+        sys.stderr.write(msg)
+
+
+if __name__ == '__main__':    
+    ## Parse arguments
+    p = argparse.ArgumentParser(description=DESC, 
+                                formatter_class = argparse.RawTextHelpFormatter)
+    group = p.add_mutually_exclusive_group()    
+    group.add_argument("-q", dest='quiet', action='store_true',
+                       help='quiet mode')
+    group.add_argument('-v', dest='verbosity', action="store_const", const=2,
+                       default=1, help='verbose mode')        
+    p.add_argument('-c', metavar='chromList', dest='chroms', type=csvChromList,
+                   default = set(),
+                   help='a comma-separated list of chromosomes' +
+                        ' (default: all)')
+    p.add_argument('-o', metavar='mod', dest='mod', type=argparse.FileType('w'), 
+                   default=None, help='the output mod file'\
+                        +' (default: sample.mod)')
+    
+    p.add_argument('ref', help='reference name')
+    p.add_argument('sample', help='requested sample name in VCF')
+    p.add_argument('infiles', metavar='vcf', nargs='+', 
+                   type=argparse.FileType('r'), help='a list of VCF files')                    
+        
+    args = p.parse_args()
+    
+    if args.mod is None:                
+        outfile = args.sample + '.mod'            
+        mod = open(outfile, 'wb')
+    else:
+        outfile = args.mod.name
+        mod = args.mod
+        
+    chroms = list(args.chroms)
+            
+    if args.quiet:
+        VERBOSITY = 0
+    else:            
+        VERBOSITY = args.verbosity
+     
+    infiles = args.infiles           
+    nFiles = len(infiles)
+    for i in range(nFiles):
+        infiles[i].close()
+
+    if VERBOSITY > 0:
+        log("from %s to %s\n" %(ref, sample), 1 ,True)
+        log("input VCF file(s): %s\n" % 
+            ', '.join([infiles[i].name for i in range(nFiles)]), 
+            1, True)                
+        log("output MOD file: %s\n" % outfile, 1, True)
+        
+    readers = [vcf.VCFReader(infiles[i].name, [sample]) for i in range(nFiles)]            
+    out = csv.writer(mod, delimiter='\t',lineterminator='\n')
+    
+    if len(chroms) == 0:
+        allChroms = set()
+        for i in range(nFiles):            
+            allChroms |= set(readers[i].chroms)        
+        chroms = sorted(allChroms)   
+    
+    mod.write("#ver=0.1\n")
+    mod.write("#ref=%s\n" % ref)
+    mod.write("#sample=%s\n" % sample)
+    for chrom in chroms:  # for each chromosome
+        gc.disable()
+        pool = []
+        for i in range(nFiles): # for each VCF file
+            count = 0
+            if chrom in readers[i].chroms:
+                if VERBOSITY > 0:
+                    log("processing chromosome %s in %s\n" % 
+                        (chrom, readers[i].fileName), 1, True)                
+                                                
+                for tup in readers[i].fetch(chrom):
+                    try:
+                        newChrom = chromMap[tup[0]]
+                    except KeyError:
+                        newChrom = chrom
+                    
+                    v = parseVariant(newChrom, tup[1], tup[2], tup[3])
+                    if v.type == SUB:
+                        pool.append(('s', newChrom, v.start[1], v.extra))                
+                    elif v.type == INS:
+                        pool.append(('i', newChrom, v.start[1], v.extra))             
+                    elif v.type == DEL:
+                        # Change non-atomic deletions to atomic
+                        for i in range(v.length): 
+                            pool.append(('d', newChrom, v.start[1]+i, v.extra[i]))                                         
+                    else:
+                        raise ValueError("Unknown variant type: %s" % v.type)                        
+                    count += 1
+                if VERBOSITY > 0:
+                    log("%d variants found in %s\n" % 
+                        (count, readers[i].fileName), 1, True)
+            else:
+                if VERBOSITY > 0:
+                    log("chromosome %s not found in %s\n" % 
+                        (chrom, readers[i].fileName), 1, True)
+                    
+        
+        pool=sorted(set(pool), key = lambda tup: tup[2])            
+        out.writerows(pool)
+        if VERBOSITY > 0:
+            log("%d unique atomic variants written to MOD\n" % len(pool), 1, True)
+        del pool
+        gc.enable()                        
+                    
+    
+    mod.close()
+    
+    if VERBOSITY > 0:
+        log("building tabix index for MOD\n", 1, True)
+    pysam.tabix_index(outfile, force=True, seq_col=1, start_col=2, end_col=2, 
+                      meta_char='#', zerobased=True)
+    
+    if VERBOSITY > 0:
+        log("All Done!", 1, True)

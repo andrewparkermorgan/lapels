@@ -5,19 +5,17 @@ Created on Oct 28, 2012
 @author: Shunping Huang
 '''
 
-import os
 import pysam
-import gzip
 import csv
 import gc
 import sys
 import argparse
 from time import localtime, strftime
 
-from modtools import vcfreader as vcf
-from modtools.variants import parseVariant, SUB, INS, DEL
+import dbutils as dbu
+from modtools.variants import parseVariant, INS, DEL
 
-DESC = 'A VCF to MOD converter.'
+DESC = 'A DB to MOD converter.'
 __version__ = '0.0.1'
 VERBOSITY = 1
 
@@ -26,7 +24,7 @@ chromMap = dict([(str(i), 'chr'+str(i)) for i in range(20)] +
                  ('M', 'chrM'), ('MT',' chrM')])
                 
 
-#infiles = ["../../data/indels.chr1_2.vcf.gz", "../../data/snps.chr1_2.vcf.gz"]
+#dbu.db = "/playpen/data/newgenes.db"
 #outfile = "./test.mod"
 #ref = 'mm9'
 #sample = 'A_J'
@@ -76,11 +74,11 @@ if __name__ == '__main__':
                         +' (default: sample.mod)')
     
     p.add_argument('ref', help='reference name')
-    p.add_argument('sample', help='requested sample name in VCF')
-    p.add_argument('infiles', metavar='vcf', nargs='+', 
-                   type=argparse.FileType('r'), help='a list of VCF files')                    
+    p.add_argument('sample', help='requested sample name in DB')
+    p.add_argument('db', type=argparse.FileType('r'), help='database location')                    
         
     args = p.parse_args()
+    
     
     if args.mod is None:                
         outfile = args.sample + '.mod'            
@@ -92,32 +90,24 @@ if __name__ == '__main__':
     chroms = list(args.chroms)
     sample = args.sample
     ref = args.ref
-            
+    
     if args.quiet:
         VERBOSITY = 0
     else:            
         VERBOSITY = args.verbosity
-     
-    infiles = args.infiles           
-    nFiles = len(infiles)
-    for i in range(nFiles):
-        infiles[i].close()
-
+    
+    args.db.close()
+    db = args.db.name    
+    
     if VERBOSITY > 0:
         log("from %s to %s\n" %(ref, sample), 1 ,True)
-        log("input VCF file(s): %s\n" % 
-            ', '.join([infiles[i].name for i in range(nFiles)]), 
-            1, True)                
+        log("input DB file: %s\n" % db, 1, True)                
         log("output MOD file: %s\n" % outfile, 1, True)
-        
-    readers = [vcf.VCFReader(infiles[i].name, [sample]) for i in range(nFiles)]            
+                        
     out = csv.writer(mod, delimiter='\t',lineterminator='\n')
     
-    if len(chroms) == 0:
-        allChroms = set()
-        for i in range(nFiles):            
-            allChroms |= set(readers[i].chroms)        
-        chroms = sorted(allChroms)   
+    if len(chroms) == 0:                    
+        chroms = [str(i) for i in range(1,20)] + ['X','Y','M']
     
     mod.write("#ver=0.1\n")
     mod.write("#ref=%s\n" % ref)
@@ -125,39 +115,48 @@ if __name__ == '__main__':
     for chrom in chroms:  # for each chromosome
         gc.disable()
         pool = []
-        for i in range(nFiles): # for each VCF file
-            count = 0
-            if chrom in readers[i].chroms:
-                if VERBOSITY > 0:
-                    log("processing chromosome %s in %s\n" % 
-                        (chrom, readers[i].fileName), 1, True)                
-                                                
-                for tup in readers[i].fetch(chrom):
-                    try:
-                        newChrom = chromMap[tup[0]]
-                    except KeyError:
-                        newChrom = chrom
-                    
-                    v = parseVariant(newChrom, tup[1], tup[2], tup[3])
-                    if v.type == SUB:
-                        pool.append(('s', newChrom, v.start[1], v.extra))                
-                    elif v.type == INS:
-                        pool.append(('i', newChrom, v.start[1], v.extra))             
-                    elif v.type == DEL:
-                        # Change non-atomic deletions to atomic
-                        for i in range(v.length): 
-                            pool.append(('d', newChrom, v.start[1]+i, v.extra[i]))                                         
-                    else:
-                        raise ValueError("Unknown variant type: %s" % v.type)                        
-                    count += 1
-                if VERBOSITY > 0:
-                    log("%d variants found in %s\n" % 
-                        (count, readers[i].fileName), 1, True)
+        
+        if VERBOSITY > 0:
+            log("processing chromosome %s in db\n" % 
+                chrom, 1, True)  
+        
+        # Read SNPs        
+        snps = dbu.readSNPsFromDB(db, dbu.chromMap[chrom], 
+                                  dbu.strainMap[sample])        
+        nSNPs = len(snps)
+        for snp in snps: 
+            try:
+                newChrom = chromMap[chrom]
+            except KeyError:
+                newChrom = chrom               
+            pool.append(('s', newChrom, snp[0], "%s/%s" % (snp[1],snp[2])))
+        
+        if VERBOSITY > 0:    
+            log("%d SNP(s) read from DB\n" % nSNPs, 1, True)
+        del snps
+
+        ## Read indels    
+        indels = dbu.readIndelsFromDB(db, dbu.chromMap[chrom], 
+                                      dbu.strainMap[sample])        
+        nIndels = len(indels)
+        for indel in indels:
+            try:
+                newChrom = chromMap[chrom]
+            except KeyError:
+                newChrom = chrom            
+            v=parseVariant(newChrom, indel[0], indel[1], indel[2])            
+            if v.type == INS:            
+                pool.append(('i', newChrom, v.start[1], v.extra))                                           
+            elif v.type == DEL:
+                # Change non-atomic deletions to atomic
+                for i in range(v.length): 
+                    pool.append(('d', newChrom, v.start[1]+i, v.extra[i]))                                        
             else:
-                if VERBOSITY > 0:
-                    log("chromosome %s not found in %s\n" % 
-                        (chrom, readers[i].fileName), 1, True)
-                    
+                raise ValueError("Unknown variant type: %s" % v.type)
+        
+        if VERBOSITY > 0:
+            log("%d indel(s) read from DB\n" % nIndels, 1, True)
+        del indels                    
         
         pool=sorted(set(pool), key = lambda tup: tup[2])            
         out.writerows(pool)

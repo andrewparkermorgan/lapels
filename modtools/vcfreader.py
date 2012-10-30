@@ -115,8 +115,9 @@ class VCFReader():
         self.nColumns = 0      
         
         # Compress with bgzip
-        if not fileName.endswith('.gz') and not os.path.isfile(fileName+'.gz'):
-            pysam.tabix_compress(fileName, fileName+'.gz')
+        if not fileName.endswith('.gz'):
+            if not os.path.isfile(fileName+'.gz'):
+                pysam.tabix_compress(fileName, fileName+'.gz')
             fileName += '.gz'
         
         # Build tabix index

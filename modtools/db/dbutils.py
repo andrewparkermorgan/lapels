@@ -5,8 +5,9 @@ db="/playpen/data/newgenes.db"
 chromMap = dict([(str(i),i) for i in range(1,20)]+[('X',20),('Y',21),('M',22)])
 strainMap = {'A':'aAJ',
            'A/J': 'aAJ',
-           'AJ': 'aA_J',
+           'AJ': 'aAJ',
            'B':'aC57BL',
+           'C57BL':'aC57BL',
            'C57BL/6J':'aC57BL',
            'B6':'aC57BL',
            'C':'a129S1',

@@ -19,23 +19,18 @@ class Mod:
     '''The class for parsing a piece of a mod file from the same chromosome.'''
     
     def __init__(self, fileName):
-        '''Initialize with the data from one chromosome.
-        chrom: the template chromosome id
-        maxLen: the template chromosome length
-        dataIter: an iterator of tuples extracted from a mod file. Each tuple
-            should have 4 fields.
-        '''
                 
-        # Compress with bgzip
-        if not fileName.endswith('.gz'): 
-            if not os.path.isfile(fileName+'.gz'):
-                pysam.tabix_compress(fileName, fileName+'.gz')
-            fileName += '.gz'
-                
-        # Build tabix index
-        if not os.path.isfile(fileName+'.tbi'):
-            pysam.tabix_index(fileName, force=True, seq_col=1, start_col=2, 
-                              end_col=2, meta_char='#', zerobased=True)                     
+#        # Compress with bgzip
+#        if not fileName.endswith('.gz'): 
+#            if not os.path.isfile(fileName+'.gz'):
+#                pysam.tabix_compress(fileName, fileName+'.gz')
+#            fileName += '.gz'
+#                
+#        # Build tabix index
+#        if not os.path.isfile(fileName+'.tbi'):
+#            pysam.tabix_index(fileName, force=True, seq_col=1, start_col=2, 
+#                              end_col=2, meta_char='#', zerobased=True)
+        
                 
         self.tabix = pysam.Tabixfile(fileName)
         self.fileName = fileName
@@ -191,8 +186,9 @@ class Mod:
         if fastaChrom not in chromLens.keys():
             raise ValueError("Chromosome '%s' not found in FASTA. " % 
                              fastaChrom +
-                             "Possible names: %s." % 
-                             ','.join(sorted(chromLens.keys())))
+                             "Possible names: %s. " % 
+                             ','.join(sorted(chromLens.keys())) +
+                             "Chromosome name mapping may be used.\n")
                 
         # If no content in MOD for this chromosome
         if len(data) == 0:

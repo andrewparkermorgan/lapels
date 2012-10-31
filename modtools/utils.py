@@ -27,7 +27,9 @@ def log(s, verbosity=2, showtime=False):
         sys.stderr.write(msg)
         
         
-def buildChromMap(fp):
+def buildChromMap(fileName):
+    assert fileName is not None
+    fp = open(fileName, 'r')
     chromMap = {}
     if fp is not None:
         for line in fp:
@@ -39,6 +41,7 @@ def buildChromMap(fp):
                     chromMap[tmp[0]] = tmp[1]
                 except IndexError:
                     raise ValueError('Mapping format not correct.')
+    fp.close()
     return chromMap
 
 

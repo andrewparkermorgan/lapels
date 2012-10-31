@@ -7,10 +7,12 @@ Created on Oct 28, 2012
 
 import os
 import pysam
-import argparse
+import argparse as ap
 
 from modtools.mod2 import Mod
 from modtools.utils import buildChromMap, getOutChrom, log
+from modtools import tmpmod
+
 from time import localtime,strftime
 
 DESC = 'A FASTA generator for in silico genomes'
@@ -24,7 +26,7 @@ DESC = 'A FASTA generator for in silico genomes'
 
 def seq2fasta(fp, sample, seq, chrom, width):
     fp.write('>%s chromosome:%s:%s:1:%d:1 %s\n' 
-             % (chrom, sample, chrom, len(seq), strftime("v:%y%m%d",localtime())))
+             % (chrom, sample, chrom, len(seq), strftime("date:%Y%m%d",localtime())))
     length = len(seq)
     for i in range(0, length, width):
         if (i+width)<=length:
@@ -34,102 +36,135 @@ def seq2fasta(fp, sample, seq, chrom, width):
         fp.write('\n')
     fp.flush()
 
-def csvChromList(s):
-    chroms = set()
+
+def validChromList(s):
+    chromList = []
+    chromSet = set()                    
     for chrom in s.split(','):
-        chroms.add(chrom)            
-    return sorted(chroms)
+        if chrom in chromSet:
+            raise ap.ArgumentTypeError("Duplicated chromosome '%s' found."
+                                       % chrom)
+        else:
+            chromSet.add(chrom)
+            chromList.append(chrom)            
+    return chromList
+
+
+def readableFile(fileName):
+    if os.path.isfile(fileName) and os.access(fileName, os.R_OK):
+        return fileName
+    else:
+        raise ap.ArgumentTypeError("Cannot read file '%s'." % fileName)
+
+
+def writableFile(fileName):
+    if os.access(os.path.dirname(fileName), os.W_OK):
+        return fileName
+    else:
+        raise ap.ArgumentTypeError("Cannot write file '%s'." % fileName)
 
 
 if __name__ == '__main__':    
     ## Parse arguments
-    p = argparse.ArgumentParser(description=DESC, 
-                                formatter_class = argparse.RawTextHelpFormatter)
+    p = ap.ArgumentParser(description=DESC, 
+                          formatter_class = ap.RawTextHelpFormatter)
     group = p.add_mutually_exclusive_group()    
     group.add_argument("-q", dest='quiet', action='store_true',
                        help='quiet mode')
     group.add_argument('-v', dest='verbosity', action="store_const", const=2,
                        default=1, help='verbose mode')        
-    p.add_argument('-c', metavar='chromList', dest='chroms', type=csvChromList,
-                   default = set(),
+    p.add_argument('-c', metavar='chromList', dest='chroms', type=validChromList,
+                   default = [],
                    help='a comma-separated list of chromosomes in MOD' +
                         ' (default: all)')
     p.add_argument('-s', metavar='sample', dest='sample', default=None, 
                    help='sample name (default: <mod_prefix>)')
-    p.add_argument('--map1', metavar='chromMap1', dest='mapfp1', type=argparse.FileType('r'),
-                   default = None,
+    p.add_argument('--map1', metavar='chromMap1', dest='cmap1', 
+                   type=readableFile, default = None,
                    help='the file of chromosome name mapping from MOD to input FASTA' +
-                        ' (default: none)')
-    p.add_argument('--map2', metavar='chromMap2', dest='mapfp2', type=argparse.FileType('r'),
-                   default = None,
+                   ' (default: none)')
+    p.add_argument('--map2', metavar='chromMap2', dest='cmap2',
+                   type=readableFile, default = None,
                    help='the file of chromosome name mapping from MOD to output FASTA' +
-                        ' (default: none)')
+                   ' (default: none)')
     p.add_argument('-w', metavar='width', dest='width', type=int, default = 72,  
                    help='the width in output FASTA  (default: 72)')    
-    p.add_argument('-o', metavar='out.fa', dest='outfasta', type=argparse.FileType('w'), 
-                   default=None, help='the output FASTA file'\
-                        +' (default: out.fasta)')
+    p.add_argument('-o', metavar='out.fa', dest='outfasta', type=writableFile, 
+                   default=None, help='the output FASTA file ' + 
+                   '(default: out.fasta)')
     
     p.add_argument('mod', metavar='in.mod', 
-                   type=argparse.FileType('r'), help='an input MOD file')
+                   type=readableFile, help='an input MOD file')
                         
     p.add_argument('infasta', metavar='in.fa',
-                   type=argparse.FileType('r'), help='an input (reference) FASTA file')                    
+                   type=readableFile, help='an input (reference) FASTA file')                    
         
     args = p.parse_args()
     
+    if args.quiet:
+        VERBOSITY = 0
+    else:            
+        VERBOSITY = args.verbosity
+        
     if args.sample is None:
-        sample = os.path.basename(args.mod.name)
+        sample = os.path.basename(args.mod)
         idx = sample.index('.')
         if idx >= 0:
             sample = sample[:idx]
         sample.replace(':','_')
     else:
-        sample = args.sample 
+        sample = args.sample
     
     if args.outfasta is None:               
         outfasta = open('out.fa', 'wb')
     else:        
-        outfasta = args.outfasta
+        outfasta = open(args.outfasta, 'wb')
         
-    chromMap1 = buildChromMap(args.mapfp1)
-    chromMap2 = buildChromMap(args.mapfp2)
+    if args.cmap1 is None:        
+        chromMap1 = {}
+    else:
+        chromMap1 = buildChromMap(args.cmap1)
+        
+    if args.cmap2 is None:        
+        chromMap2 = {}
+    else:
+        chromMap2 = buildChromMap(args.cmap2)
     
-    chroms = list(args.chroms)
+    chroms = args.chroms 
     width = args.width
-            
-    if args.quiet:
-        VERBOSITY = 0
-    else:            
-        VERBOSITY = args.verbosity
     
-    args.mod.close()
-    mod = Mod(args.mod.name)
-    
-    args.infasta.close()                
+    # A compromise: adding complexity but reducing unnecessary argument.
+    if VERBOSITY > 0:
+        log("extracting MOD file ...\n", 1, True)
+    tmpmod = tmpmod.getTabixMod(args.mod)
+    mod = Mod(tmpmod)
+                
+    if len(args.chroms) == 0: 
+        chroms = mod.chroms
+                    
     # Build index on fasta
-    if not os.path.isfile(args.infasta.name+'.fai'):
-        pysam.faidx(args.infasta.name)            
+    if not os.path.isfile(args.infasta+'.fai'):
+        pysam.faidx(args.infasta)            
     
-    fp = open(args.infasta.name+'.fai')
+    fp = open(args.infasta+'.fai')
     inChromLengths = {}
     for line in fp:
         tmp = line.rstrip().split('\t')
         inChromLengths[tmp[0]] = int(tmp[1])
     fp.close()
+     
 #    print (inChromLengths)
 
-    infasta = pysam.Fastafile(args.infasta.name)
-    
+    infasta = pysam.Fastafile(args.infasta)
+        
     if VERBOSITY > 0:                            
-        log("input MOD file: %s\n" % mod.fileName, 1, True)
+        log("input MOD file: %s (%s)\n" % (args.mod, mod.fileName), 1, True)
         log("input FASTA file: %s\n" % infasta.filename, 1, True)
-        log("output FASTA file: %s\n" % outfasta.name, 1, True)
-                
+        log("output FASTA file: %s\n" % outfasta.name, 1, True)                
     
     for chrom in chroms:
         if VERBOSITY > 0:
-            log("loading chromosome '%s' from MOD...\n" % chrom, 1, True)            
+            log("loading chromosome '%s' from MOD\n" % chrom, 1, True)            
         mod.load(chrom)
         if VERBOSITY > 0:
             log("%d line(s) found in MOD\n" % len(mod.data), 1, True)
@@ -150,5 +185,9 @@ if __name__ == '__main__':
         seq2fasta(outfasta, sample, seq, outFastaChrom, width)
         
     outfasta.close()
+    # Clean up the temp files
+    os.remove(mod.fileName)
+    os.remove(mod.fileName+'.tbi')
+    
     if VERBOSITY > 0:
         log("All Done!\n", 1, True)

@@ -8,11 +8,12 @@ import tempfile
 import gzip
 import pysam
 
+__all__ = ['getTabixMod']
 
 def getTabixMod(filename):
     '''Unzip a mod file, use bgzip to rezip it, and and build tabix index.'''
     modfp = gzip.open(filename, 'rb')
-    fd, tmpName = tempfile.mkstemp('.tsv')
+    tmpName = tempfile.mkstemp('.tsv')[1]
     tmpfp = open(tmpName, 'wb')
     tmpfp.writelines(modfp)
     tmpfp.close()

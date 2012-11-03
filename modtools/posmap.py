@@ -9,6 +9,7 @@ Created on Sep 20, 2012
 import bisect
 import gc
 
+__all__ = ['PosMap']
 
 class PosMap:
     def __init__(self, dataIter=None):

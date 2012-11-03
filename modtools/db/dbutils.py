@@ -1,5 +1,6 @@
 import sqlite3
 
+
 db="/playpen/data/newgenes.db"
 
 chromMap = dict([(str(i),i) for i in range(1,20)]+[('X',20),('Y',21),('M',22)])
@@ -31,6 +32,7 @@ strainMap = {'A':'aAJ',
            'WSB/EiJ':'aWSB',
            'WSB':'aWSB'}
 
+__all__ = ['chromMap', 'strainMap', 'readIndelsFromDB', 'readSNPsFromDB']
 
 def readIndelsFromDB(db, chromoID, sample):
     assert sample.startswith('a')

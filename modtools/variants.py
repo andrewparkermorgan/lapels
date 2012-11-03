@@ -10,10 +10,10 @@ TRN='t' #Translocation
 VARIANT_TYPES=set([DEL,SUB,INS,INV,DUP,TRN])
 
 class Variant:
-    def __init__(self, chrom, offset, length, type, extra=None):        
+    def __init__(self, chrom, offset, length, vtype, extra=None):        
         self.start = (str(chrom), int(offset)) #offset is 0-based.
         self.length = int(length)
-        self.type = type
+        self.type = vtype
         self.extra = extra
         
     def __str__(self):        
@@ -71,17 +71,17 @@ class Translocation:
         self.r2 = Variant(chrom2, offset2, length2)
 
 
-def variantFactory(chrom, offset, length, type, extra=None):              
+def variantFactory(chrom, offset, length, vtype, extra=None):              
 #    if type == MAT:
 #        assert extra == None and length > 0
 #        return Match(chrom, offset, length)
-    if type == SUB:
+    if vtype == SUB:
         assert length == 1 and len(extra)>=1
         return SNP(chrom, offset, extra)
-    if type == DEL:
+    if vtype == DEL:
         assert length == len(extra) and length > 0
         return Deletion(chrom, offset, extra)
-    if type == INS:
+    if vtype == INS:
         assert length == len(extra) and length > 0
         return Insertion(chrom, offset, extra)
 

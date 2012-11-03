@@ -7,10 +7,9 @@ Created on Oct 28, 2012
 
 import os
 import pysam
-import argparse as ap
-
+import argparse as ap 
 from modtools.mod2 import Mod
-from modtools.utils import buildChromMap, getOutChrom, log
+from modtools.utils import *
 from modtools import tmpmod
 
 from time import localtime,strftime
@@ -35,33 +34,6 @@ def seq2fasta(fp, sample, seq, chrom, width):
             fp.write(seq[i:])
         fp.write('\n')
     fp.flush()
-
-
-def validChromList(s):
-    chromList = []
-    chromSet = set()                    
-    for chrom in s.split(','):
-        if chrom in chromSet:
-            raise ap.ArgumentTypeError("Duplicated chromosome '%s' found."
-                                       % chrom)
-        else:
-            chromSet.add(chrom)
-            chromList.append(chrom)            
-    return chromList
-
-
-def readableFile(fileName):
-    if os.path.isfile(fileName) and os.access(fileName, os.R_OK):
-        return fileName
-    else:
-        raise ap.ArgumentTypeError("Cannot read file '%s'." % fileName)
-
-
-def writableFile(fileName):
-    if os.access(os.path.dirname(fileName), os.W_OK):
-        return fileName
-    else:
-        raise ap.ArgumentTypeError("Cannot write file '%s'." % fileName)
 
 
 if __name__ == '__main__':    

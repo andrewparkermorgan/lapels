@@ -8,12 +8,13 @@ Created on Sep 20, 2012
 
 import gc
 import pysam
-import os
 from modtools import posmap
 from modtools.utils import getOutChrom
 
 
 VERSION = '0.0.3'
+
+__all__ = ['Mod', 'VERSION']
 
 class Mod:
     '''The class for parsing a piece of a mod file from the same chromosome.'''

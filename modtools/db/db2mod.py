@@ -9,17 +9,17 @@ import csv
 import gc
 import argparse as ap
 import gzip
-import os 
 from time import localtime,strftime
 
 import dbutils as dbu
 from modtools.variants import parseVariant, INS, DEL
-from modtools.utils import buildChromMap,getOutChrom,log
+from modtools.utils import *
 from modtools import version
 
 DESC = 'A DB to MOD converter.'
 __version__ = '0.0.2'
 VERBOSITY = 1
+
 
 #dbu.db = "/playpen/data/newgenes.db"
 #outfile = "./test.mod"
@@ -27,32 +27,6 @@ VERBOSITY = 1
 #sample = 'A_J'
 #chroms = []
 
-
-def validChromList(s):
-    chromList = []
-    chromSet = set()                    
-    for chrom in s.split(','):
-        if chrom in chromSet:
-            raise ap.ArgumentTypeError("Duplicated chromosome '%s' found."
-                                       % chrom)            
-        else:
-            chromSet.add(chrom)
-            chromList.append(chrom)            
-    return chromList
-
-
-def readableFile(fileName):
-    if os.path.isfile(fileName) and os.access(fileName, os.R_OK):
-        return fileName
-    else:
-        raise ap.ArgumentTypeError("Cannot read file '%s'." % fileName)
-
-
-def writableFile(fileName):
-    if os.access(os.path.dirname(fileName), os.W_OK):
-        return fileName
-    else:
-        raise ap.ArgumentTypeError("Cannot write file '%s'." % fileName)
  
 
 if __name__ == '__main__':

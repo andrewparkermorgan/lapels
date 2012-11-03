@@ -17,6 +17,8 @@ FMT_FS = ':'
 
 VERBOSITY = 0
     
+__all__ = ['parseFormat', 'getGenotype', 'parseGenotype', 
+           'VCFIterator', 'VCFReader']
 
 def parseFormat(fmt, data):
     formatFields = fmt.split(FMT_FS)

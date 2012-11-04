@@ -284,4 +284,121 @@ class Mod:
             self.buildSeq(fasta, chrom, chromMap, chromLens)
         assert len(self.seq) > 0
         return self.seq
+    
+        
+    
+#    def buildRawCigar(self, fasta, chrom, chromMap, chromLens):
+#        '''Build the sequence based on the mod data and reference sequences.'''
+#        
+#        M = 'M'
+#        I = 'I'
+#        S = 'S'
+#        D = 'D'
+#        
+#        assert chrom == self.chrom
+#        
+#        data = self.data        
+#        assert data is not None
+#                
+#        fastaChrom = getOutChrom(chromMap, chrom)
+#        if fastaChrom not in chromLens.keys():
+#            raise ValueError("Chromosome '%s' not found in FASTA. " % 
+#                             fastaChrom +
+#                             "Possible names: %s. " % 
+#                             ','.join(sorted(chromLens.keys())) +
+#                             "Chromosome name mapping may be used.\n")
+#                
+#        # If no content in MOD for this chromosome
+#        if len(data) == 0:
+#            self.seq = fasta.fetch(reference=fastaChrom, start=0) 
+#            return 
+#        
+#        gc.disable()
+#        
+#        chromLen = chromLens[fastaChrom]        
+#        nRows = len(data)
+#        seqs = []
+#
+#        # Current position in reference/new genome coordinate
+#        refPos = 0
+#        newPos = 0
+#        varPos = data[0][2]
+#
+#        # Rows in data[startIdx:endIdx] have the same position
+#        startIdx = 0
+#        endIdx = 0
+#        for i in range(nRows+1):
+#            if i < nRows and data[i][2] == varPos:
+#                endIdx+=1
+#                continue
+#
+#            #assert refPos <= varPos
+#            if (refPos > varPos):
+#                raise ValueError("Position not in order at line %d" %(i+1))
+#
+#            # Fill 'M's in the gap.
+#            if refPos < varPos:                
+#                #seqs.append(fasta.fetch(reference=fastaChrom, start=refPos, 
+#                #                        end=varPos))
+#                for k in range(refPos,varPos):
+#                    seqs.append(M)
+#                                    
+#                newPos += varPos - refPos
+#                refPos = varPos                
+#
+#            subSegs=[(1, 'm')]
+#            for j in range(startIdx,endIdx):
+#                tup = data[j]
+#                if tup[0] == 's':
+#                    subSegs[0] = (1, 's', tup[3])
+#                elif tup[0] == 'i':
+#                    subSegs.append((len(tup[3]), 'i', tup[3]))                        
+#                elif tup[0] == 'd':
+#                    subSegs[0] = (1, 'd')
+#                else:
+#                    raise ValueError("Unknown operation %s" % tup[0])
+#
+#            for seg in subSegs:
+#                segLen = seg[0]
+#                segType = seg[1]
+#                if segType == 'm':                    
+#                    #seqs.append(fasta.fetch(reference=fastaChrom, start=refPos,
+#                    #                        end=refPos+segLen))
+#                    for k in range(segLen):
+#                        seqs.append(M)
+#                    refPos += segLen
+#                    newPos += segLen
+#                elif segType == 's':
+#                    #seqs.append(seg[2][-1])                    
+#                    seqs.append(S)
+#                    refPos += segLen
+#                    newPos += segLen
+#                elif segType == 'i':
+#                    #seqs.append(seg[2])
+#                    for k in range(len(seg[2])):
+#                        seqs.append(I)
+#                    newPos += segLen
+#                elif segType == 'd':
+#                    refPos += segLen
+#                else:
+#                    raise ValueError("Unknown operation %s" % segType)
+#
+#            startIdx = endIdx
+#            endIdx += 1
+#
+#            if i<len(data):
+#                varPos = data[i][2]
+#
+#        #assert refPos <= refLens[chrom]
+#        if refPos > chromLen:
+#            raise ValueError("Variant position out of reference boundary")
+#
+#        if refPos < chromLen:
+#            #seqs.append(fasta.fetch(reference=fastaChrom, start=refPos))
+#            for k in range(refPos, chromLen):
+#                seqs.append(M)
+#
+#        gc.enable()
+#        return ''.join(seqs)
 
+    

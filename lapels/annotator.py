@@ -15,6 +15,8 @@ import cigarutils as cu
 import cigarbuilder
 import regionutils
 
+from lapels.utils import log
+
 VERSION = '0.0.5'
 TESTING = False     ## For unit test: return the annotated read data once set to 1.
 VERBOSITY = 0     ## Print out detail log during the process.
@@ -70,8 +72,12 @@ def getTargetRegions(rseq):
         elif op == 1:                     ## Insertion(I1)
             ret.append((op, None, newpos, newpos-1))
         elif op == 2 or op == 3:          ## Deletion(D_1)/Splice junction(N_1)
-            assert length > 0
-            ret.append((op, None, newpos, newpos+length-1))
+            if length <= 0:
+                print(rseq)
+                print(op)
+                print(length)
+            else:           
+                ret.append((op, None, newpos, newpos+length-1))
             newpos += length
     if newpos != rseq.aend:
         raise ValueError("cigar %s conflicts with read region %d-%d." 
@@ -80,22 +86,20 @@ def getTargetRegions(rseq):
 
     
 class Annotator:
-    def __init__(self, chrom, mod, inBam, nReads=None, tagNames=None, outBam = None, 
-                 log = sys.stdout.write):            
+    def __init__(self, chrom, chromLen, mod, inBam, nReads=None, 
+                 tagPrefixes=None, outBam = None):            
         self.mod = mod
         self.chrom = chrom
+        self.chromLen = chromLen
         self.nReads = nReads
         self.inBam = inBam
-        self.tagNames = tagNames
-        self.outBam = outBam                
-        self.log = log        
+        self.tagPrefixes = tagPrefixes
+        self.outBam = outBam        
     
     
-    def setTag(self, tags, tagId, value):
-        if self.tagNames is not None:
-            tagName = self.tagNames[tagId]
-            if tagName is not None:          
-                tags[tagName] = value
+    def setTag(self, tags, key, value):        
+        if key is not None:          
+            tags[key] = value
     
     
     def parseTargetRegion(self, region, rseq):
@@ -293,12 +297,12 @@ class Annotator:
         return (op, ncigar, nstart, nend, npos, nSNPs, nInsertions, nDeletions)
     
         
-    def execute(self):
-        self.posmap = self.mod.getPosMap()
+    def execute(self):        
+        self.posmap = self.mod.getPosMap(self.chrom, self.chromLen)
         self.data = self.mod.data
-        self.modKey = [tup[2] for tup in self.data]
-        log = self.log
+        self.modKey = [tup[2] for tup in self.data]        
         count = 0
+        count2 = 0
         if TESTING:
             results = []
         if self.nReads == 0:
@@ -306,7 +310,7 @@ class Annotator:
         if VERBOSITY > 0 and not TESTING:            
             log("progress: %3d%%\r" % (count*100/self.nReads), 1, True)
                      
-        for rseq in self.inBam:      ## Annotate each reads    
+        for rseq in self.inBam:      ## Annotate each reads
             if VERBOSITY > 1:                
                 log("%s\n" % rseq.qname)                
                 log("tgt read pos: %d.\n" % rseq.pos)
@@ -463,16 +467,17 @@ class Annotator:
                     nDeletions += reg[7]
                                                     
             ## Set tags
-            tags = dict(rseq.tags)            
-            self.setTag(tags, 0, nSNPs)
-            self.setTag(tags, 1, nInsertions)
-            self.setTag(tags, 2, nDeletions)
-            self.setTag(tags, 3, cu.toString(rseq.cigar).translate(None,','))            
-            if 'NM' in tags.keys():
-                self.setTag(tags, 4, tags['NM'])
-                if self.tagNames[4] != 'NM':
-                    del tags['NM']  ## Delete the old 'NM' tag.
-                                            
+            tags = dict(rseq.tags)       
+            self.setTag(tags, self.tagPrefixes[0]+'0', nSNPs)            
+            self.setTag(tags, self.tagPrefixes[1]+'0', nInsertions)
+            self.setTag(tags, self.tagPrefixes[2]+'0', nDeletions)            
+            self.setTag(tags, 'OC', cu.toString(rseq.cigar).translate(None,','))
+            self.setTag(tags, 'OM', tags['NM'])            
+            del tags['NM']  ## Delete the old 'NM' tag.
+                  
+            if nSNPs != 0 or nInsertions != 0 or nDeletions != 0:
+                count2 += 1
+                                          
             rseq.tags = [(key, tags[key]) for key in sorted(tags.keys())] 
                         
             ## Set pos to be the first M            
@@ -509,4 +514,5 @@ class Annotator:
                                 
         if TESTING:              
             return results
+        log("%d read(s) have variants\n" % count2, 1, True)
         return count

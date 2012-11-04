@@ -25,50 +25,115 @@ Created on Oct 3, 2012
 
 import unittest
 import StringIO
-import csv
+import tempfile
+import os
+import pysam
 
-from lapels import blockreader
-from lapels import annotator
+from lapels import annotator2 as annot
 from lapels import cigarutils
-from modtools import mod
+from modtools import mod2
 
 
-class Read:
-    '''Class for simulating reads from a bam file'''
-    def __init__(self, start, end, cigar=None):
-        self.qname = 'unknown'
-        self.pos = start
-        self.aend = end
-        self.tags = dict()
-        if cigar is None:
-            self.cigar = [(0, self.aend - self.pos)]
-        else:
-            self.cigar = cigar
 
 polish = lambda x: cigarutils.toString(cigarutils.simplify(x))
 
 
+
+class Read:
+    '''Class for simulating reads from a bam file'''
+    def __init__(self, start, end, cigar=None, qlen=None):
+        self.qname = 'unknown'
+        self.pos = start
+        self.aend = end     #one base after the actual end
+        self.tags = dict()        
+        if cigar is None:
+            self.cigar = [(0, self.aend - self.pos)]
+        else:
+            self.cigar = cigar
+        if qlen is None:
+            self.qlen = 0
+            for op,length in self.cigar:
+                if op == 0 or op == 7 or op == 8 or op == 1:
+                    self.qlen += length
+        else:
+            self.qlen = qlen
+
+
+
+class TestGetReadOffset(unittest.TestCase):
+    '''Test class for getReadOffset() method '''
+    def setUp(self):
+        pass
+
+    
+    def test1(self):
+        r = Read(10, 50, [(0,10),(1,5),(0,10),(2,10),(0,10)])
+        self.assertRaisesRegexp(ValueError, 'underflows', annot.getReadOffset, r, 1)
+        self.assertEquals(annot.getReadOffset(r, 10), 0)
+        self.assertEquals(annot.getReadOffset(r, 19), 9)
+        self.assertEquals(annot.getReadOffset(r, 20), 15)
+        self.assertEquals(annot.getReadOffset(r, 29), 24)
+        self.assertRaisesRegexp(ValueError, 'deletion', annot.getReadOffset, r, 30)
+        self.assertRaisesRegexp(ValueError, 'deletion', annot.getReadOffset, r, 39)
+        self.assertEquals(annot.getReadOffset(r, 40), 25)
+        self.assertEquals(annot.getReadOffset(r, 49), 34)
+        self.assertRaisesRegexp(ValueError, 'overflows', annot.getReadOffset, r, 50)
+
+
+    def test2(self):
+        # qlen is set wrongly on purpose
+        r = Read(10, 50, [(0,10),(1,5),(0,10),(2,10),(0,10)], 30)  
+        self.assertRaisesRegexp(ValueError, 'underflows', annot.getReadOffset, r, 1)
+        self.assertEquals(annot.getReadOffset(r, 10), 0)
+        self.assertEquals(annot.getReadOffset(r, 19), 9)
+        self.assertEquals(annot.getReadOffset(r, 20), 15)
+        self.assertEquals(annot.getReadOffset(r, 29), 24)
+        self.assertRaisesRegexp(ValueError, 'deletion', annot.getReadOffset, r, 30)
+        self.assertRaisesRegexp(ValueError, 'deletion', annot.getReadOffset, r, 39)
+        self.assertEquals(annot.getReadOffset(r, 40), 25)
+        self.assertEquals(annot.getReadOffset(r, 44), 29)
+        self.assertRaisesRegexp(ValueError, 'conflict', annot.getReadOffset, r, 45)
+        self.assertRaisesRegexp(ValueError, 'conflict', annot.getReadOffset, r, 49)
+        self.assertRaisesRegexp(ValueError, 'conflict', annot.getReadOffset, r, 50)                
+
+        
+    
 class TestAnnotator(unittest.TestCase):    
-    ''' Test class for AnnotateCommand '''
+    ''' Test class for Annotator '''
             
     def setUp(self):
-        annotator.TESTING = 1
-        annotator.VERBOSITY = 1
+        annot.TESTING = 1
+        annot.VERBOSITY = 1
        
 
-    def batchTestHelper(self, modFile, pool, refLens):
-        fp = modFile
-        modReader = csv.reader(fp,delimiter='\t')
-        self.chromoID = -1
-        br = blockreader.BlockReader(modReader, 
-                                     lambda tup: tup[1] != self.chromoID, None)
-        self.chromoID = br.peek()[1]        
-        self.modobj = mod.Mod(self.chromoID, refLens[self.chromoID], br)
+    def batchTestHelper(self, modFile, pool, refLens):        
+        #modReader = csv.reader(fp,delimiter='\t')
+        #self.chromoID = -1
+        #br = blockreader.BlockReader(modReader, 
+        #                             lambda tup: tup[1] != self.chromoID, None)
+        #self.chromoID = br.peek()[1]
+               
+        #self.modobj = mod2.Mod(self.chromoID, refLens[self.chromoID], br)
+        
+        tmpName = tempfile.mkstemp('.tsv')[1]
+        tmpfp = open(tmpName, 'wb')
+        for line in modFile:
+            tmpfp.write(line)
+        tmpfp.close()
+        pysam.tabix_index(tmpName, force=True, seq_col=1, start_col=2, end_col=2, 
+                      meta_char='#', zerobased=True)
+        tmpName += '.gz'
+        modFile.close()
+        
+        self.chromoID = '1'
+        self.modobj = mod2.Mod(tmpName)
+        self.modobj.load(self.chromoID)
         
         for tup in pool:       
             bamIter=[Read(tup[0], tup[1]+1, tup[2]) for tup in pool]        
                                    
-        a = annotator.Annotator(self.chromoID, self.modobj, bamIter)
+        a = annot.Annotator(self.chromoID, refLens[self.chromoID],
+                                self.modobj, bamIter)
         results = a.execute()
         
         for i,res in enumerate(results):            
@@ -77,6 +142,10 @@ class TestAnnotator(unittest.TestCase):
             self.assertEqual(res[2], pool[i][5])
             self.assertEqual(res[3], pool[i][6])
             self.assertEqual(res[4], pool[i][7])
+        
+        os.remove(tmpName)
+        os.remove(tmpName+'.tbi')
+        
               
                 
     def test1(self):
@@ -98,7 +167,7 @@ class TestAnnotator(unittest.TestCase):
     read10:   ==**********==***************====
     '''
 
-        annotator.LOG = 1
+        annot.LOG = 1
         refLens = {'1':55}        
         modFile = StringIO.StringIO('''d\t1\t10\t1
 d\t1\t11\t2
@@ -127,7 +196,7 @@ d\t1\t41\t7
 d\t1\t42\t8
 d\t1\t43\t9
 d\t1\t44\t0
-''')        
+''')                
         pool = [ (2, 6, None, '5M', 2, 0, 0, 0),
                  (12, 16, None, '5I', -1, 0, 5, 0),
                  (10, 19, None, '10I', -1, 0, 10 ,0),

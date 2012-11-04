@@ -15,9 +15,10 @@ from modtools import vcfreader as vcf
 from modtools.variants import parseVariant, SUB, INS, DEL
 from modtools.utils import *
 from modtools import version
+from modtools import alias
 
 DESC = 'A VCF to MOD converter.'
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 VERBOSITY = 1
                 
 
@@ -40,11 +41,11 @@ if __name__ == '__main__':
                         default=1, help='verbose mode')                    
     p.add_argument('-c', metavar='chromList', dest='chroms', 
                    type=validChromList, default = [],
-                   help='a comma-separated list of chromosomes in VCF' +
+                   help='a comma-separated list of chromosomes in output' +
                         ' (default: all)')
-    p.add_argument('--map', metavar='chromMap', dest='cmap', 
+    p.add_argument('-a', metavar='aliasFile', dest='alias', 
                    type=readableFile, default = None,
-                   help='the file of chromosome name mapping from VCF to MOD' +
+                   help='the file of chromosome name alias definition' +
                         ' (default: none)')
     p.add_argument('-o', metavar='mod', dest='mod', 
                    type=writableFile, default=None, 
@@ -68,10 +69,11 @@ if __name__ == '__main__':
     else:
         modfp = gzip.open(args.mod, 'wb')        
     
-    if args.cmap is None:        
-        chromMap = {}
+    if args.alias is None:        
+        chromAliases = alias.chromAliases
     else:
-        chromMap = buildChromMap(args.cmap)
+        chromAliases = alias.Alias()
+        chromAliases.readFromFile(args.alias)
                         
     chroms = args.chroms        
     sample = args.sample
@@ -101,50 +103,66 @@ if __name__ == '__main__':
     modfp.write("#sample=%s\n" % sample)    
     out = csv.writer(modfp, delimiter='\t',lineterminator='\n')
     
-    for chrom in chroms:  # for each chromosome        
+    for modChrom in chroms:  # for each chromosome        
         gc.disable()
         nSub = 0            
         nIns = 0
         nDel = 0
         pool = []        
-        modChrom = getOutChrom(chromMap, chrom)
-        for i in range(nFiles): # for each VCF file                                    
-            if chrom in vcfs[i].chroms:
-                count = 0                            
+        chrom = chromAliases.getBasicName(modChrom)
+        aliases = chromAliases.getAliasNames(chrom)        
+        for i in range(nFiles): # for each VCF file
+            isAliasFound = False
+            
+            for alias in aliases: # for each alias
                 if VERBOSITY > 0:
-                    log("processing chromosome '%s' in %s\n" % 
-                        (chrom, vcfs[i].fileName), 1, True)                                                                
-                for tup in vcfs[i].fetch(chrom):                                                                            
-                    v = parseVariant(modChrom, tup[1], tup[2], tup[3])
-                    if v.type == SUB:
-                        pool.append(('s', modChrom, v.start[1], v.extra))
-                        nSub += 1                
-                    elif v.type == INS:
-                        pool.append(('i', modChrom, v.start[1], v.extra))
-                        nIns += v.length             
-                    elif v.type == DEL:
-                        # Change non-atomic deletions to atomic
-                        for j in range(v.length):
-                            pool.append(('d', modChrom, v.start[1]+j, v.extra[j]))
-                        nDel += v.length                     
-                    else:
-                        raise ValueError("Unknown variant type: %s" % v.type)                        
-                    count += 1
-                if VERBOSITY > 0:
-                    log("%d variant(s) found in %s\n" % 
-                        (count, vcfs[i].fileName), 1, True)
-            else:
+                    log("try alias '%s' for chromosome '%s'\n" % 
+                        (alias, modChrom), 1, True)
+                if alias in vcfs[i].chroms:
+                    isAliasFound = True
+                    count = 0                        
+                    if VERBOSITY > 0:
+                        log("processing chromosome alias '%s' in %s\n" % 
+                            (alias, vcfs[i].fileName), 1, True)                                                                
+                    for tup in vcfs[i].fetch(alias):                                                                            
+                        v = parseVariant(modChrom, tup[1], tup[2], tup[3])
+                        if v.type == SUB:
+                            pool.append(('s', modChrom, v.start[1], v.extra))
+                            nSub += 1                
+                        elif v.type == INS:
+                            pool.append(('i', modChrom, v.start[1], v.extra))
+                            nIns += v.length             
+                        elif v.type == DEL:
+                            # Change non-atomic deletions to atomic
+                            for j in range(v.length):
+                                pool.append(('d', modChrom, v.start[1]+j, 
+                                             v.extra[j]))
+                            nDel += v.length                     
+                        else:
+                            raise ValueError("Unknown variant type: %s" % 
+                                             v.type)                        
+                        count += 1
+                    if VERBOSITY > 0:
+                        log("%d variant(s) found in %s\n" % 
+                            (count, vcfs[i].fileName), 1, True)
+                else:
+                    if VERBOSITY > 0:
+                        log("chromosome alias '%s' not found in %s\n" % 
+                            (alias, vcfs[i].fileName), 1, True)
+                        
+            if not isAliasFound:
                 if VERBOSITY > 0:
                     log("Warning: chromosome '%s' not found in %s\n" % 
-                        (chrom, vcfs[i].fileName), 2, True)
+                        (modChrom, vcfs[i].fileName), 2, True)
                             
         pool=sorted(set(pool), key = lambda tup: tup[2])            
         out.writerows(pool)
-        if VERBOSITY > 0:
+        if VERBOSITY > 0:            
             log("%d line(s) written to MOD\n" % len(pool), 1, True)
-            log("SNPs: %d base(s)\n" % nSub, 1, True)
-            log("Insertions: %d base(s)\n" % nIns, 1, True)
-            log("Deletions: %d base(s)\n" % nDel, 1, True)
+            if len(pool) > 0:
+                log("SNPs: %d base(s)\n" % nSub, 1, True)
+                log("Insertions: %d base(s)\n" % nIns, 1, True)
+                log("Deletions: %d base(s)\n" % nDel, 1, True)
             
         del pool
         gc.enable()                        

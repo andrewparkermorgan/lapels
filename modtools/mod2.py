@@ -9,7 +9,6 @@ Created on Sep 20, 2012
 import gc
 import pysam
 from modtools import posmap
-from modtools.utils import getOutChrom
 
 
 VERSION = '0.0.3'
@@ -176,17 +175,17 @@ class Mod:
         return self.posmap
 
 
-    def buildSeq(self, fasta, chrom, chromMap, chromLens):
+    def buildSeq(self, fasta, chrom, chromAliases, chromLens):
         '''Build the sequence based on the mod data and reference sequences.'''
         assert chrom == self.chrom
         
         data = self.data        
         assert data is not None
-                
-        fastaChrom = getOutChrom(chromMap, chrom)
-        if fastaChrom not in chromLens.keys():
-            raise ValueError("Chromosome '%s' not found in FASTA. " % 
-                             fastaChrom +
+        
+        basicName = chromAliases.getBasicName(chrom)
+        fastaChrom = chromAliases.getMatchedAlias(basicName, chromLens.keys())        
+        if fastaChrom is None:
+            raise ValueError("Chromosome '%s' not found in FASTA. " % chrom +
                              "Possible names: %s. " % 
                              ','.join(sorted(chromLens.keys())) +
                              "Chromosome name mapping may be used.\n")
@@ -275,13 +274,13 @@ class Mod:
         gc.enable()
 
 
-    def getSeq(self, fasta, chrom, chromMap, chromLens):
-        '''Return the sequence of the in silico chromosome'''        
+    def getSeq(self, fasta, chrom, chromAliases, chromLens):
+        '''Return the sequence of the in silico chromosome'''
         if self.chrom != chrom:
             self.load(chrom)
             
         if self.seq is None:
-            self.buildSeq(fasta, chrom, chromMap, chromLens)
+            self.buildSeq(fasta, chrom, chromAliases, chromLens)
         assert len(self.seq) > 0
         return self.seq
     

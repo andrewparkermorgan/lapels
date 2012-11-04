@@ -15,9 +15,10 @@ import dbutils as dbu
 from modtools.variants import parseVariant, INS, DEL
 from modtools.utils import *
 from modtools import version
+from modtools import alias
 
 DESC = 'A DB to MOD converter.'
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 VERBOSITY = 1
 
 
@@ -40,12 +41,12 @@ if __name__ == '__main__':
                         default=1, help='verbose mode')                    
     p.add_argument('-c', metavar='chromList', dest='chroms', 
                    type=validChromList, default = [],
-                   help='a comma-separated list of chromosomes in VCF' +
+                   help='a comma-separated list of chromosomes in output' +
                         ' (default: all)')
-    p.add_argument('--map', metavar='chromMap', dest='cmap', 
+    p.add_argument('-a', metavar='aliasFile', dest='alias', 
                    type=readableFile, default = None,
-                   help='the file of chromosome name mapping from VCF to MOD' +
-                        ' (default: none)')
+                   help='the file of chromosome name alias definition' +
+                        ' (default: none)')    
     p.add_argument('-o', metavar='mod', dest='mod', 
                    type=writableFile, default=None, 
                    help='the output mod file'\
@@ -67,10 +68,11 @@ if __name__ == '__main__':
     else:
         modfp = gzip.open(args.mod, 'wb')        
     
-    if args.cmap is None:        
-        chromMap = {}
+    if args.alias is None:        
+        chromAliases = alias.chromAliases
     else:
-        chromMap = buildChromMap(args.cmap)
+        chromAliases = alias.Alias()
+        chromAliases.readFromFile(args.alias)
                         
     chroms = args.chroms        
     sample = args.sample
@@ -91,13 +93,14 @@ if __name__ == '__main__':
     modfp.write("#sample=%s\n" % sample)    
     out = csv.writer(modfp, delimiter='\t',lineterminator='\n')
     
-    for chrom in chroms:  # for each chromosome
+    for modChrom in chroms:  # for each chromosome
         gc.disable()
         nSub = 0            
         nIns = 0
         nDel = 0
         pool = []
-        modChrom = getOutChrom(chromMap, chrom)
+        
+        chrom = chromAliases.getBasicName(modChrom)
         
         if VERBOSITY > 0:
             log("processing chromosome '%s' in db\n" % 

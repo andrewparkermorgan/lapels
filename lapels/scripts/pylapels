@@ -19,6 +19,7 @@ from modtools import tmpmod
 from lapels.utils import *
 from lapels import annotator,blockreader
 from lapels.mm9_meta import *
+from modtools import alias
 import lapels.version
 
 
@@ -49,7 +50,11 @@ if __name__ == '__main__':
     group.add_argument("-q", dest='quiet', action='store_true',
                        help='quiet mode')  
     group.add_argument('-v', dest='verbosity', action="store_const", const=2,
-                       default=1, help='verbose mode')        
+                       default=1, help='verbose mode')
+    p.add_argument('-a', metavar='aliasFile', dest='alias', 
+                   type=readableFile, default = None,
+                   help='the file of chromosome name alias definition' +
+                        ' (default: none)')       
     p.add_argument('-c', metavar='chromList', dest='chroms', 
                    type=validChromList, default = set(),
                    help='a comma-separated list of chromosomes (default: all)')
@@ -93,6 +98,12 @@ if __name__ == '__main__':
             
     chroms = args.chroms
     tagPrefixes = [args.ts, args.ti, args.td]
+        
+    if args.alias is None:        
+        chromAliases = alias.chromAliases
+    else:
+        chromAliases = alias.Alias()
+        chromAliases.readFromFile(args.alias)
         
     annotator.VERBOSITY = VERBOSITY
         
@@ -168,37 +179,47 @@ if __name__ == '__main__':
                           referencenames=inFile.references)
     
     
-    for chrom in chroms:
+    for outChrom in chroms:
         gc.disable()
+        
         if VERBOSITY > 0:
-            log("loading chromosome '%s' from MOD\n" % chrom, 1, True)            
-        mod.load(chrom)
+            log("processing chromosome '%s'\n" % outChrom, 1, True)         
+        chrom = chromAliases.getBasicName(outChrom)
+        
+        modChrom = chromAliases.getMatchedAlias(chrom, mod.chroms)
+        if modChrom is None:
+            if VERBOSITY > 0:
+                log("chromosome alias not found for '%s' in MOD\n" % outChrom, 1, True) 
+            modChrom = chrom
+        else:
+            if VERBOSITY > 0:
+                log("chromosome alias '%s' used for '%s' in MOD\n" % 
+                    (modChrom, outChrom), 1, True)      
+        mod.load(modChrom)
+
         if VERBOSITY > 0:
             log("%d line(s) found in MOD\n" % len(mod.data), 1, True)
             if len(mod.data) == 0:
-                log("Warning: chromosome '%s' not found in MOD, " % chrom + 
+                log("Warning: chromosome '%s' not found in MOD, " % outChrom + 
                     "maybe incorrect name or mapping\n" 
                     , 2, True)
                 
-        if VERBOSITY > 0:
-            log("annotating reads mapping to chr%s from bam file\n" 
-                % chrom, 1, True)
-                                
-        ## Guess chromosome name in bam file
-        try:
-            try:
-                bamIter = inFile.fetch(chrom)
-                nReads = nReadsInChroms[chrom]
-            except ValueError:
-                bamIter = inFile.fetch('chr'+chrom)
-                nReads = nReadsInChroms['chr'+chrom]
-        except ValueError:
-            raise ValueError("Unable to determine the name of chr%s in bam." 
-                             % chrom)      
+        
+        bamChrom = chromAliases.getMatchedAlias(chrom, nReadsInChroms.keys())
+        if bamChrom is None:
+            raise ValueError("Unable to determine the name of '%s' in BAM." 
+                             % outChrom)
+        else:
+            if VERBOSITY > 0:
+                log("chromosome alias '%s' used for '%s' in BAM\n" % 
+                    (bamChrom, outChrom), 1, True)
+            bamIter = inFile.fetch(bamChrom)
+            nReads = nReadsInChroms[bamChrom]        
+            
         if VERBOSITY > 0:
             log("%d read(s) found\n" % nReads, 1, True)
             
-        a = annotator.Annotator(chrom, refLengths[chrom], mod, bamIter, 
+        a = annotator.Annotator(modChrom, refLengths[chrom], mod, bamIter, 
                                 nReads, tagPrefixes, tmpFile)            
         count = a.execute()        
         

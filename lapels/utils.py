@@ -12,8 +12,7 @@ import sys
 import argparse as ap
 from time import localtime, strftime
 
-__all__ = ['log', 'validChromList', 'readableFile', 'writableFile', 
-           'buildChromMap', 'getOutChrom'] 
+__all__ = ['log', 'validChromList', 'readableFile', 'writableFile'] 
 
 
 def log(s, verbosity=2, showtime=False):     

@@ -29,7 +29,7 @@ import tempfile
 import os
 import pysam
 
-from lapels import annotator2 as annot
+from lapels import annotator3 as annot
 from lapels import cigarutils
 from modtools import mod2
 
@@ -190,16 +190,17 @@ d\t1\t43\t9
 d\t1\t44\t0
 ''')                
         pool = [ 
-#                (2, 6, None, '5M', 2, 0, 0, 0),
-#                 (12, 16, None, '5I', -1, 0, 5, 0),
-#                 (10, 19, None, '10I', -1, 0, 10 ,0),
-#                 (13, 22, None, '7I,10D,3M', 25, 0, 7, 10),
-#                 (10, 29, None, '10I,10D,10M', 25, 0, 10, 10),
-#                 (23, 37, None, '7M,5I,10D,3M', 28, 0, 5, 10),
-#                 (20, 44, None, '10M,5I,10D,10M', 25, 0, 5, 10),
-#                 (0, 44, None, '10M,5D,10I,10D,10M,5I,10D,10M', 0, 0, 15, 25),
-                 (13, 37, [(0,4), (2,5), (0, 6), (2, 7), (0,3)], '4I,12D,6M,12D,3M', 27, 0 , 4 ,0), ###number of deletions?
-                 (13, 37, [(0,4), (3,5), (0, 6), (3, 7), (0,3)], '4I,12N,6M,2N,10D,3M', 27, 0 , 4 ,0), ###number of deletions?
+                (2, 6, None, '5M', 2, 0, 0, 0),
+                 (12, 16, None, '5I', -1, 0, 5, 0),
+                 (10, 19, None, '10I', -1, 0, 10 ,0),
+                 (13, 22, None, '7I,10D,3M', 25, 0, 7, 10),
+                 (10, 29, None, '10I,10D,10M', 25, 0, 10, 10),
+                 (23, 37, None, '7M,5I,10D,3M', 28, 0, 5, 10),
+                 (20, 44, None, '10M,5I,10D,10M', 25, 0, 5, 10),
+                 (0, 44, None, '10M,5D,10I,10D,10M,5I,10D,10M', 0, 0, 15, 25),
+                 (13, 37, [(0,4), (2,5), (0, 6), (2, 7), (0,3)], '4I,12D,6M,12D,3M', 27, 0 , 4 ,0), 
+                 (13, 37, [(0,4), (3,5), (0, 6), (3, 7), (0,3)], '4I,12N,6M,12N,3M', 27, 0 , 4 ,0), 
+                 #(13, 37, [(0,4), (3,5), (0, 6), (3, 7), (0,3)], '4I,12N,6M,2N,10D,3M', 27, 0 , 4 ,0),
                  (2, 28, [(0,4),(2,4),(0,5),(2,5),(0,9)], '4M,9D,5I,10D,9M', 2, 0, 5, 0)
                 ]
     
@@ -292,96 +293,96 @@ i\t1\t24\tabcdefghij
 
 
 
-class TestAnnotator2(unittest.TestCase):    
-    '''
-    Test case for insertions/deletion/splicing junction in read
-        
-            10M |  10I  | 10M   | 5D    | 10M   |  5I  | 5D    | 5I   | 10M
-    Ref   : 0-9 |  -9   | 10-19 | 20-24 | 25-34 | -34  | 35-39 | -39  | 40-49
-    Tgt   : 0-9 | 10-19 | 20-29 | -29   | 30-39 | 40-44| -44   | 45-49| 50-59
-    Read1 : =^=
-    Read2 :    =^=
-    Read3 :        =^=
-    Read4 :            =^=
-    Read5 :                    =^=
-    Read6 :                                    =^=
-    Read7 :                                       =^=
-    Read8 :                                           =^=    
-    Read9:                                                       =^=
-    Read10:                                                           =^=    
-    '''
-            
-    def setUp(self):
-        annot.TESTING = 1
-        annot.VERBOSITY = 1
-        annot.LOG = 1
-        
-        self.refLens = {'1':50}
-        self.modFile = StringIO.StringIO('''i\t1\t9\tabcdefghij
-d\t1\t20\t1
-d\t1\t21\t2
-d\t1\t22\t3
-d\t1\t23\t4
-d\t1\t24\t5
-i\t1\t34\tklmno
-d\t1\t35\t6
-d\t1\t36\t7
-d\t1\t37\t8
-d\t1\t38\t9
-d\t1\t39\t0
-i\t1\t39\tpqrst
-''')
-    
-    
-    def batchTestHelper(self, modFile, pool, refLens):                
-        tmpName = tempfile.mkstemp('.tsv')[1]
-        tmpfp = open(tmpName, 'wb')
-        for line in modFile:
-            tmpfp.write(line)
-        tmpfp.close()
-        pysam.tabix_index(tmpName, force=True, seq_col=1, start_col=2, end_col=2, 
-                      meta_char='#', zerobased=True)
-        tmpName += '.gz'
-        modFile.close()
-        
-        self.chromoID = '1'
-        self.modobj = mod2.Mod(tmpName)
-        self.modobj.load(self.chromoID)
-        
-        for tup in pool:       
-            bamIter=[Read(tup[0], tup[1]+1, tup[2]) for tup in pool]        
-                                   
-        a = annot.Annotator(self.chromoID, refLens[self.chromoID],
-                                self.modobj, bamIter)
-        results = a.execute()
-        
-        for i,res in enumerate(results):            
-            self.assertEqual(polish(res[0]),pool[i][3])
-            self.assertEqual(res[1], pool[i][4])
-            self.assertEqual(res[2], pool[i][5])
-            self.assertEqual(res[3], pool[i][6])
-            self.assertEqual(res[4], pool[i][7])
-        
-        os.remove(tmpName)
-        os.remove(tmpName+'.tbi')
-        
-                            
-    def test4(self):
-        cigar = [(0,2),(1,1),(0,2)]
-        
-        pool = [(2,5,cigar,'2M,1I,2M', 2, 0, 0, 0),
-                (8,11,cigar,'2M,3I', 8, 0, 2, 0),
-                (12,15,cigar,'5I', -1, 0, 4, 0),
-                (18,21,cigar,'3I,2M', 10, 0, 2, 0),
-                (28,31,cigar,'2M,1I,5D,2M', 18, 0, 0, 0), #########
-                (38,41,cigar,'2M,3I', 33, 0, 2, 0),
-                (41,44,cigar,'5I', -1, 0, 4, 0),
-                (43,46,cigar,'3I,5D,2I', -1, 0, 4, 0),  ########
-                (45,48,cigar,'5I', -1, 0, 4, 0),
-                (48,51,cigar,'3I,2M', 40, 0, 2, 0),     
-                ]
-                
-        self.batchTestHelper(self.modFile, pool, self.refLens)
+#class TestAnnotator2(unittest.TestCase):    
+#    '''
+#    Test case for insertions/deletion/splicing junction in read
+#        
+#            10M |  10I  | 10M   | 5D    | 10M   |  5I  | 5D    | 5I   | 10M
+#    Ref   : 0-9 |  -9   | 10-19 | 20-24 | 25-34 | -34  | 35-39 | -39  | 40-49
+#    Tgt   : 0-9 | 10-19 | 20-29 | -29   | 30-39 | 40-44| -44   | 45-49| 50-59
+#    Read1 : =^=
+#    Read2 :    =^=
+#    Read3 :        =^=
+#    Read4 :            =^=
+#    Read5 :                    =^=
+#    Read6 :                                    =^=
+#    Read7 :                                       =^=
+#    Read8 :                                           =^=    
+#    Read9:                                                       =^=
+#    Read10:                                                           =^=    
+#    '''
+#            
+#    def setUp(self):
+#        annot.TESTING = 1
+#        annot.VERBOSITY = 1
+#        annot.LOG = 1
+#        
+#        self.refLens = {'1':50}
+#        self.modFile = StringIO.StringIO('''i\t1\t9\tabcdefghij
+#d\t1\t20\t1
+#d\t1\t21\t2
+#d\t1\t22\t3
+#d\t1\t23\t4
+#d\t1\t24\t5
+#i\t1\t34\tklmno
+#d\t1\t35\t6
+#d\t1\t36\t7
+#d\t1\t37\t8
+#d\t1\t38\t9
+#d\t1\t39\t0
+#i\t1\t39\tpqrst
+#''')
+#    
+#    
+#    def batchTestHelper(self, modFile, pool, refLens):                
+#        tmpName = tempfile.mkstemp('.tsv')[1]
+#        tmpfp = open(tmpName, 'wb')
+#        for line in modFile:
+#            tmpfp.write(line)
+#        tmpfp.close()
+#        pysam.tabix_index(tmpName, force=True, seq_col=1, start_col=2, end_col=2, 
+#                      meta_char='#', zerobased=True)
+#        tmpName += '.gz'
+#        modFile.close()
+#        
+#        self.chromoID = '1'
+#        self.modobj = mod2.Mod(tmpName)
+#        self.modobj.load(self.chromoID)
+#        
+#        for tup in pool:       
+#            bamIter=[Read(tup[0], tup[1]+1, tup[2]) for tup in pool]        
+#                                   
+#        a = annot.Annotator(self.chromoID, refLens[self.chromoID],
+#                                self.modobj, bamIter)
+#        results = a.execute()
+#        
+#        for i,res in enumerate(results):            
+#            self.assertEqual(polish(res[0]),pool[i][3])
+#            self.assertEqual(res[1], pool[i][4])
+#            self.assertEqual(res[2], pool[i][5])
+#            self.assertEqual(res[3], pool[i][6])
+#            self.assertEqual(res[4], pool[i][7])
+#        
+#        os.remove(tmpName)
+#        os.remove(tmpName+'.tbi')
+#        
+#                            
+#    def test4(self):
+#        cigar = [(0,2),(1,1),(0,2)]
+#        
+#        pool = [(2,5,cigar,'2M,1I,2M', 2, 0, 0, 0),
+#                (8,11,cigar,'2M,3I', 8, 0, 2, 0),
+#                (12,15,cigar,'5I', -1, 0, 4, 0),
+#                (18,21,cigar,'3I,2M', 10, 0, 2, 0),
+#                (28,31,cigar,'2M,1I,5D,2M', 18, 0, 0, 0), #########
+#                (38,41,cigar,'2M,3I', 33, 0, 2, 0),
+#                (41,44,cigar,'5I', -1, 0, 4, 0),
+#                (43,46,cigar,'3I,5D,2I', -1, 0, 4, 0),  ########
+#                (45,48,cigar,'5I', -1, 0, 4, 0),
+#                (48,51,cigar,'3I,2M', 40, 0, 2, 0),     
+#                ]
+#                
+#        self.batchTestHelper(self.modFile, pool, self.refLens)
 
 
 

@@ -15,15 +15,20 @@ class CigarBuilder():
         self.cigar = []
             
         
-    def append(self, region):        
-        if self.pend >= 0:
-#            print region
-            delta = region[2] - 1 - self.pend
-            assert delta >= 0
-            if delta > 0:
-                self.cigar.append((2, delta))  ##Insert deletions to gaps
+    def append(self, region):
+        if region[0] != 1:
+            if self.pend >= 0:            
+                delta = region[2] - 1 - self.pend
+                if delta < 0:
+                    print region
+                    print self.pend                        
+                assert delta >= 0
+                if delta > 0:
+                    self.cigar.append((2, delta))  ##Insert deletions to gaps
+        if region[3] >= 0:
+            self.pend = region[3]
         self.cigar.extend(region[1])
-        self.pend = region[3]
+        
     
             
     def build(self, regions):                

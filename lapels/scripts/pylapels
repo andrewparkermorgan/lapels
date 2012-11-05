@@ -7,17 +7,15 @@ Created on Sep 30, 2012
 
 import os
 import sys
-import csv
 import gc
 import pysam
 import argparse as ap
-from time import localtime, strftime
 
 from modtools.mod2 import Mod
 from modtools import tmpmod
 
 from lapels.utils import *
-from lapels import annotator2 as annotator
+#from lapels import annotator2 as annotator
 from lapels.mm9_meta import *
 from modtools import alias
 import lapels.version
@@ -58,6 +56,8 @@ if __name__ == '__main__':
     p.add_argument('-c', metavar='chromList', dest='chroms', 
                    type=validChromList, default = set(),
                    help='a comma-separated list of chromosomes (default: all)')
+    p.add_argument('--annotator', metavar='annot', dest='annot', default='1',
+                   type=int, help='choose annotator')
     p.add_argument('--ts', metavar='prefix', type=validTagPrefix, default='s',
                    help='tag prefix for numbers of observed SNPs (default: s)')
     p.add_argument('--ti', metavar='prefix', type=validTagPrefix, default='i',
@@ -83,11 +83,18 @@ if __name__ == '__main__':
 #                   default=sys.stdout, help='the log file (default: stdout)')
     args = p.parse_args()
 
+    if args.annot == 1:
+        from lapels import annotator as annotator
+    elif args.annot == 2:
+        from lapels import annotator2 as annotator
+    elif args.annot == 3:
+        from lapels import annotator3 as annotator
+    
     if args.quiet:
         VERBOSITY = 0
     else:            
         VERBOSITY = args.verbosity
-        
+    
     if args.outBam is None:        
         if not args.inBam.endswith('.bam'):
             outFileName = args.inBam + '.annotated.bam'

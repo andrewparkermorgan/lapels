@@ -83,7 +83,8 @@ def modifyRegion(region):
             elif op == 1:       ## I_0
                 cigar[i] = (-1, length)
             elif op == 2:       ## D_0
-                cigar[i] = (2, length)                        
+                cigar[i] = (3, length)  #D_0 in N_1 should be N
+                #cigar[i] = (2, length)                        
         cigar = cigarutils.simplify(cigar)            
         ret = (rop, cigar, region[2], region[3], -1, 0, 0, 0)
     

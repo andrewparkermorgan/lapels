@@ -21,7 +21,7 @@ class CigarBuilder():
             delta = region[2] - 1 - self.pend
             assert delta >= 0
             if delta > 0:
-                self.cigar.append((2, delta))
+                self.cigar.append((2, delta))  ##Insert deletions to gaps
         self.cigar.extend(region[1])
         self.pend = region[3]
     

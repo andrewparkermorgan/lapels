@@ -17,7 +17,7 @@ from modtools.mod2 import Mod
 from modtools import tmpmod
 
 from lapels.utils import *
-from lapels import annotator,blockreader
+from lapels import annotator2 as annotator
 from lapels.mm9_meta import *
 from modtools import alias
 import lapels.version

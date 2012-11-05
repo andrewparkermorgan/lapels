@@ -130,7 +130,7 @@ class Annotator:
         # The region's exact start and end in the target coordinate.
         op = region[0]
         tstart = region[2]
-        tend = region[3]        
+        tend = region[3]      
         if tstart > tend:
             assert op == 1  # It must be an insertion region(I_1)
             return (op,)
@@ -235,13 +235,14 @@ class Annotator:
                             nend = max(nend, rpos)
                             npos = min(npos, rpos)
                             
-                            rbase = rseq.seq[getReadOffset(rseq, tpos)]                            
-                            if VERBOSITY > 1:                                                        
-                                self.log("SNP found at %d: %s\n" 
-                                         % (tpos, reg[1]))                                
-                                self.log("Read base: %s\n" % rbase)
-                            if rbase == reg[1][-1]:
-                                nSNPs += 1
+                            if op != 2 and op != 3: # D_1 or N_1                                                                
+                                rbase = rseq.seq[getReadOffset(rseq, tpos)]                            
+                                if VERBOSITY > 1:                                                        
+                                    self.log("SNP found at %d: %s\n" 
+                                             % (tpos, reg[1]))                                
+                                    self.log("Read base: %s\n" % rbase)
+                                if rbase == reg[1][-1]:
+                                    nSNPs += 1
                         rpos += 1
                         tpos += 1
                     elif segType == 'i':    # Insertion         
@@ -343,6 +344,7 @@ class Annotator:
                     log("tgt reg cigar(%d): %s.\n" 
                         % (idx, cu.toString([rseq.cigar[idx]])))                 
                 rreg = self.parseTargetRegion(treg, rseq)
+                
                 if rreg[0] != 1:                # Not insertions (I_1)
                     if VERBOSITY > 1:                                        
                         log("rop: %d.\n" % rreg[0])
@@ -365,110 +367,114 @@ class Annotator:
                     if rend < rreg[3]:
                         rend = rreg[3]
                 else:
-                    if VERBOSITY > 1:
-                        log("process later.\n\n")                                                    
+                    rreg = (1, [rseq.cigar[idx]], rend+1, rend, -1)
                 regions.append(rreg)
-                
+            
+            #print regions
             assert len(regions) == len(rseq.cigar)
             
-            maxIdx = len(regions)
-            ## I1/M1/(N1,D1)
-            leftIdx = -1
-            leftPos = -1             
-            rightPos = -1
-            rightIdx = -1
-            lastInsertionEnd = -2
-            for idx, reg in enumerate(regions):
-                ## Get an M, the left bound will be one base after
-                if reg[0] != 1:
-                    if reg[0] == 0:                   #M_1
-                        leftIdx = idx
-                        leftPos = regions[leftIdx][3] + 1
-                    ## Get a D or N, left bound will include it 
-                    elif reg[0] == 2 and leftPos < 0: #D_1
-                        leftIdx = idx
-                        leftPos = regions[leftIdx][2]
-                    elif reg[0] == 3 and leftPos < 0: #N_1
-                        leftIdx = idx
-                        leftPos = regions[leftIdx][2]                
-                else:                    
-#                    assert reg[0] == 1
-                    ## Get an I
-                    ## Find the right position bound of this insertion
-                    if rightIdx < idx:
-                        rightPos = -1
-                        rightIdx = idx + 1                                                
-                        while rightIdx < maxIdx:
-                            ## Got an M, the right bound will be one base before
-                            if regions[rightIdx][0] == 0:        #M_1
-                                #print(regions[rightIdx])    
-                                rightPos = regions[rightIdx][2] - 1                              
-                                break
-                            ## Got a D or N, the right bound will include it
-                            elif regions[rightIdx][0] == 2:      #D_1
-                                rightPos = regions[rightIdx][3]
-                            elif regions[rightIdx][0] == 3:      #N_1
-                                rightPos = regions[rightIdx][3]
-                            rightIdx += 1 
-                    assert rightIdx > idx
-                    if VERBOSITY > 1: 
-                        log("-check tgt reg cigar(%d) from %d @ %d to %d @ %d\n" 
-                            %(idx, leftPos, leftIdx, rightPos, rightIdx)) 
-                    
-                    ## Shrink the search region if a previous I is in the region 
-                    leftPos = max(leftPos, lastInsertionEnd+1)
-                                        
-                    ## Either left bound or right bound is missing.
-                    ## FIX ME!!! may try to search the upstream or downstream
-                    ## for D_0 if only one bound is missing.
-                    cigar = [rseq.cigar[idx]]
-                    if leftPos < 0:
-                        if VERBOSITY > 1:                                      
-                            log("?? left bound not found.\n")
-                        ## Put it before any read position
-                        regions[idx]=(reg[0], cigar, -1, -2, -1)
-                    elif rightPos < 0:
-                        if VERBOSITY > 1:
-                            log("?? right bound not found.\n")
-                        ## Put it after any read position
-                        regions[idx]=(reg[0], cigar, rend+1, rend, -1)
-                    else:                                                                    
-                        if leftPos <= rightPos:
-                            if VERBOSITY > 1:
-                                log("!! some gap between left and right.\n")
-                                
-                            ## FIXME: find the correct position in D_0                                 
-#                            lo = bisect.bisect_left(self.modKeys, leftPos)
-#                            hi = bisect.bisect_right(self.modKeys, rightPos)                            
+#            maxIdx = len(regions)
+#            ## I1/M1/(N1,D1)
+#            leftIdx = -1
+#            leftPos = -1             
+#            rightPos = -1
+#            rightIdx = -1
+#            lastInsertionEnd = -2
+#            for idx, reg in enumerate(regions):
+#                ## Get an M, the left bound will be one base after
+#                if reg[0] != 1:
+#                    if reg[0] == 0:                   #M_1
+#                        leftIdx = idx
+#                        leftPos = regions[leftIdx][3] + 1
+#                    ## Get a D or N, left bound will include it 
+#                    elif reg[0] == 2 and leftPos < 0: #D_1
+#                        leftIdx = idx
+#                        leftPos = regions[leftIdx][2]
+#                    elif reg[0] == 3 and leftPos < 0: #N_1
+#                        leftIdx = idx
+#                        leftPos = regions[leftIdx][2]                
+#                else:                    
+##                    assert reg[0] == 1
+#                    ## Get an I
+#                    ## Find the right position bound of this insertion
+#                    if rightIdx < idx:
+#                        rightPos = -1
+#                        rightIdx = idx + 1                                                
+#                        while rightIdx < maxIdx:
+#                            ## Got an M, the right bound will be one base before
+#                            if regions[rightIdx][0] == 0:        #M_1
+#                                #print(regions[rightIdx])    
+#                                rightPos = regions[rightIdx][2] - 1                              
+#                                break
+#                            ## Got a D or N, the right bound will include it
+#                            elif regions[rightIdx][0] == 2:      #D_1
+#                                rightPos = regions[rightIdx][3]
+#                            elif regions[rightIdx][0] == 3:      #N_1
+#                                rightPos = regions[rightIdx][3]
+#                            rightIdx += 1 
+#                    assert rightIdx > idx
+#                    if VERBOSITY > 1: 
+#                        log("-check tgt reg cigar(%d) from %d @ %d to %d @ %d\n" 
+#                            %(idx, leftPos, leftIdx, rightPos, rightIdx)) 
+#                    
+#                    ## Shrink the search region if a previous I is in the region 
+#                    leftPos = max(leftPos, lastInsertionEnd+1)
+#                                        
+#                    ## Either left bound or right bound is missing.
+#                    ## FIX ME!!! may try to search the upstream or downstream
+#                    ## for D_0 if only one bound is missing.
+#                    cigar = [rseq.cigar[idx]]
+#                    if leftPos < 0:
+#                        if VERBOSITY > 1:                                      
+#                            log("?? left bound not found.\n")
+#                        ## Put it before any read position
+#                        regions[idx]=(reg[0], cigar, -1, -2, -1)
+#                    elif rightPos < 0:
+#                        if VERBOSITY > 1:
+#                            log("?? right bound not found.\n")
+#                        ## Put it after any read position
+#                        regions[idx]=(reg[0], cigar, rend+1, rend, -1)
+#                    else:                                                                    
+#                        if leftPos <= rightPos:
 #                            if VERBOSITY > 1:
-#                                for j in range(lo,hi):
-#                                    log(str(self.data[j]))
-#                                    log("\n")
-                                                                                                               
-                            ## do the match here
-                            ## data[lo:hi] to see if D_0 is there.
-                            ## inserted bases in the read (how to get this?)
-                            ## return position that match
-                                                        
-#                            regions[idx]=(reg[0], leftPos, 
-#                                          leftPos + cigar[0][1] - 1, 
-#                                          leftPos, [(0,cigar[0][1])])
-                            regions[idx]=(reg[0], cigar, leftPos, leftPos-1, -1)
-                        else:
-                            ## Insert into an M_0
-                            assert leftPos - rightPos == 1
-                            if VERBOSITY > 1:
-                                log("## no gap between left and right.\n")
-                            regions[idx] =(reg[0], cigar, leftPos, rightPos, -1)
-                    lastInsertionEnd = regions[idx][3]
-                    if VERBOSITY > 1:
-                        log("tgt reg start: %d, end: %d, pos: %d.\n" 
-                            % (regions[idx][2], regions[idx][3], regions[idx][4]))
-                        log("tgt reg cigar: '%s'.\n" 
-                            % cu.toString(regions[idx][1]))
-
+#                                log("!! some gap between left and right.\n")
+#                                
+#                            ## FIXME: find the correct position in D_0                                 
+##                            lo = bisect.bisect_left(self.modKeys, leftPos)
+##                            hi = bisect.bisect_right(self.modKeys, rightPos)                            
+##                            if VERBOSITY > 1:
+##                                for j in range(lo,hi):
+##                                    log(str(self.data[j]))
+##                                    log("\n")
+#                                                                                                               
+#                            ## do the match here
+#                            ## data[lo:hi] to see if D_0 is there.
+#                            ## inserted bases in the read (how to get this?)
+#                            ## return position that match
+#                                                        
+##                            regions[idx]=(reg[0], leftPos, 
+##                                          leftPos + cigar[0][1] - 1, 
+##                                          leftPos, [(0,cigar[0][1])])
+#                            regions[idx]=(reg[0], cigar, leftPos, leftPos-1, -1)
+#                        else:
+#                            ## Insert into an M_0
+#                            assert leftPos - rightPos == 1
+#                            if VERBOSITY > 1:
+#                                log("## no gap between left and right.\n")
+#                            regions[idx] =(reg[0], cigar, leftPos, rightPos, -1)
+#                    lastInsertionEnd = regions[idx][3]
+#                    if VERBOSITY > 1:
+#                        log("tgt reg start: %d, end: %d, pos: %d.\n" 
+#                            % (regions[idx][2], regions[idx][3], regions[idx][4]))
+#                        log("tgt reg cigar: '%s'.\n" 
+#                            % cu.toString(regions[idx][1]))
+#
             cb = cigarbuilder.CigarBuilder()
-            cigar=cb.build(regions)
+#            cigar=cb.build(regions)
+            for reg in regions:
+                cb.append(reg)
+            cigar = cb.cigar
+            
             
             if VERBOSITY > 1:                                                                
                 log("\nregions:\n")

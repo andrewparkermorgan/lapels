@@ -12,7 +12,7 @@ import bisect
 
 import cigarutils as cu
 import cigarbuilder
-import regionutils
+#import regionutils
 
 from lapels.utils import log
 
@@ -338,7 +338,7 @@ class Annotator:
                 
             rseq.cigar = cu.simplify(rseq.cigar)   # Simplify the cigar first.
             regions = []
-            rend = -1
+#            rend = -1
             for idx, treg in enumerate(getTargetRegions(rseq)):
                 if VERBOSITY > 1:
                     log("tgt reg cigar(%d): %s.\n" 

@@ -338,89 +338,87 @@ class Annotator:
                 
             rseq.cigar = cu.simplify(rseq.cigar)   # Simplify the cigar first.
             regions = []
-            rend = -1
-            for idx, treg in enumerate(getTargetRegions(rseq)):
+#            rend = -1
+            tregs = getTargetRegions(rseq)
+            for idx, treg in enumerate(tregs):
                 if VERBOSITY > 1:
                     log("tgt reg cigar(%d): %s.\n" 
                         % (idx, cu.toString([rseq.cigar[idx]])))
                 
-                if treg[0] == 0:
+                if treg[0] == 0 or treg[0] == 7 or treg[0] == 8:                 
                     rreg = self.parseTargetRegion(treg, rseq)
-                elif treg[0] == 1:
-                    rreg = (1, [rseq.cigar[idx]], 0, -1, -1)
-                elif treg[0] == 2:
-                    rreg = (2, )
-                elif treg[0] == 3:
-                    rreg = (3, )
-                
-#                if rreg[0] != 1:                # Not insertions (I_1)
-#                    if VERBOSITY > 1:                                        
-#                        log("rop: %d.\n" % rreg[0])
-#                        log("ref reg start: %d, end: %d, pos: %d.\n" 
-#                            % (rreg[2], rreg[3], rreg[4]))
-#                        log("ref reg cigar: '%s'.\n" 
-#                            % cu.toString(rreg[1]))
-#                        log("s: %d, i: %d, d: %d.\n" 
-#                            % (rreg[5], rreg[6], rreg[7]))                    
-#                                                  
-#                    rreg = regionutils.modifyRegion(rreg)
-#                    
-#                    if VERBOSITY > 1:                      
-#                        log("fixed start: %d, end: %d, pos: %d.\n" 
-#                            % (rreg[2], rreg[3], rreg[4]))
-#                        log("fixed cigar: '%s'.\n" 
-#                            % cu.toString(rreg[1]))
-#                        log("s: %d, i: %d, d: %d.\n\n" 
-#                            % (rreg[5], rreg[6], rreg[7]))                                            
+#                    print rreg
+                    
+                    if VERBOSITY > 1:                                        
+                        log("rop: %d.\n" % rreg[0])
+                        log("ref reg start: %d, end: %d, pos: %d.\n" 
+                            % (rreg[2], rreg[3], rreg[4]))
+                        log("ref reg cigar: '%s'.\n" 
+                            % cu.toString(rreg[1]))
+                        log("s: %d, i: %d, d: %d.\n" 
+                            % (rreg[5], rreg[6], rreg[7]))                                                                 
 #                    if rend < rreg[3]:
 #                        rend = rreg[3]
-#                else:
-#                    rreg = (1, [rseq.cigar[idx]], rend+1, rend, -1)
+                elif treg[0] == 2 or treg[0] == 3:
+                    rreg = (treg[0], )
+                    if VERBOSITY > 1:
+                        log("process later.\n")
+                else:
+                    #rreg = (1, [rseq.cigar[idx]], rend+1, rend, -1)
+                    rreg = (1, [rseq.cigar[idx]], 0, -1, -1)
+                    
                 regions.append(rreg)
             
 #            print regions
-            assert len(regions) == len(rseq.cigar)
-            
-#            print("before")
-#            for reg in regions:
-#                print(reg)
-                
             nRegions = len(regions)
-            #assert regions[0][0] == 0
-            pend = -2
+            assert nRegions == len(rseq.cigar)
+                                    
             for idx in range(nRegions):
-                if regions[idx][0] == 0:
-                    pend = regions[idx][3]
-                elif regions[idx][0] == 2:
-                    regions[idx] = (2, None, pend+1, )
-                elif regions[idx][0] == 3:
-                    regions[idx] = (3, None, pend+1, )
-            
-#            print("get start")
-#            for reg in regions:
-#                print(reg)
-                
-            pstart = -1
-            for idx in range(nRegions-1, -1, -1):
-                if regions[idx][0] == 0:
-                    pstart = regions[idx][2]
-                elif regions[idx][0] == 2:
-                    delta = pstart - regions[idx][2]
-                    if delta > 0:
-                        regions[idx] = (2, [(2, delta)], regions[idx][2], pstart-1, -1)
-                    else:
-                        regions[idx] = (2, [], regions[idx][2], pstart-1, -1)
-                elif regions[idx][0] == 3:
-                    delta = pstart - regions[idx][2]
-                    if delta > 0:
-                        regions[idx] = (3, [(3, delta)], regions[idx][2], pstart-1, -1)
-                    else:
-                        regions[idx] = (3, [], regions[idx][2], pstart-1, -1)                    
-            
-#            print("get end")
-#            for reg in regions:
-#                print(reg)
+                op = regions[idx][0]
+                if op == 2 or op == 3:
+                    if VERBOSITY > 1:
+                        log("tgt reg cigar(%d): %s.\n" 
+                            % (idx, cu.toString([rseq.cigar[idx]])))                    
+                    if ((idx > 0) and idx < (nRegions - 1) and 
+                        (regions[idx-1][0] == 0) and (regions[idx+1][0] == 0)):
+                        delta = regions[idx+1][2] - regions[idx-1][3] - 1
+                        assert delta >= 0
+                        if delta == 0:                                                   
+                            rreg = (op, [], 
+                                    regions[idx-1][3]+1, 
+                                    regions[idx+1][2]-1, 
+                                    -1)
+                        else:                                                                                                       
+                            rreg = (op, [(op, delta)], 
+                                    regions[idx-1][3]+1, 
+                                    regions[idx+1][2]-1, 
+                                    -1)
+
+                    else:                        
+                        rreg = self.parseTargetRegion(tregs[idx], rseq)                        
+                        if VERBOSITY > 1:                                        
+                            log("rop: %d.\n" % rreg[0])
+                            log("ref reg start: %d, end: %d, pos: %d.\n" 
+                                % (rreg[2], rreg[3], rreg[4]))
+                            log("ref reg cigar: '%s'.\n" 
+                                % cu.toString(rreg[1]))
+                            log("s: %d, i: %d, d: %d.\n" 
+                                % (rreg[5], rreg[6], rreg[7]))     
                         
+                        rreg = regionutils.modifyRegion(rreg)
+                    
+                        if VERBOSITY > 1:                      
+                            log("fixed start: %d, end: %d, pos: %d.\n" 
+                                % (rreg[2], rreg[3], rreg[4]))
+                            log("fixed cigar: '%s'.\n" 
+                                % cu.toString(rreg[1]))
+                            log("s: %d, i: %d, d: %d.\n\n" 
+                                % (rreg[5], rreg[6], rreg[7]))
+                    regions[idx] = rreg                                            
+            
+            #print regions
+            #assert nRegions == len(rseq.cigar)
+            
 #            maxIdx = len(regions)
 #            ## I1/M1/(N1,D1)
 #            leftIdx = -1
@@ -581,7 +579,7 @@ class Annotator:
             
             if VERBOSITY > 0 and not TESTING:                
                 if count % 10000 == 0:
-                    log("progress: %3d%%\r" % (count*100/self.nReads), 1, True)            
+                    log("progress: %3d%%\r" % (count*100/self.nReads), 1, True)        
                 
         if VERBOSITY > 0 and not TESTING:
             log("progress: %3d%%\n" % (count*100/self.nReads), 1, True)

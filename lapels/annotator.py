@@ -8,9 +8,7 @@ Created on Sep 1, 2012
 @author: Shunping Huang
 '''
 
-import sys
 import bisect
-
 import cigarutils as cu
 import cigarbuilder
 import regionutils

@@ -251,7 +251,8 @@ class MetaData:
 
     
     def getChromLength(self, chrom):
-        return self.chromLengths[self.chromAliases.getBasicName(chrom)]
+        basicName = self.chromAliases.getBasicName(chrom)        
+        return self.chromLengths.get(basicName, None)
     
     
     def verify(self, chrom, fastaFileName):

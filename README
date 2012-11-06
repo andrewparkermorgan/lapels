@@ -58,7 +58,7 @@ Users need to download the tarball of source from
     
 and then type:
 
-    easy_install Lapels-<version>.tar.gz
+    easy_install lapels-<version>.tar.gz
     
 By default, the package will be installed under the directory of Python
 dist-packages, and the executable of pylapels can be found under 

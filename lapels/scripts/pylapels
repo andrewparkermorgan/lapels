@@ -16,8 +16,6 @@ from modtools import tmpmod
 
 from lapels.utils import *
 #from lapels import annotator2 as annotator
-from lapels.mm9_meta import *
-from modtools import alias
 import lapels.version
 
 
@@ -56,8 +54,9 @@ if __name__ == '__main__':
     p.add_argument('-c', metavar='chromList', dest='chroms', 
                    type=validChromList, default = set(),
                    help='a comma-separated list of chromosomes (default: all)')
-    p.add_argument('--annotator', metavar='annot', dest='annot', default='3',
-                   type=int, help='choose annotator')
+    p.add_argument('--engine', metavar='id', dest='engine', 
+                   type=int, default='4', choices=range(1, 5), 
+                   help='engine id (1-4) (default: 4)')
     p.add_argument('--ts', metavar='prefix', type=validTagPrefix, default='s',
                    help='tag prefix for numbers of observed SNPs (default: s)')
     p.add_argument('--ti', metavar='prefix', type=validTagPrefix, default='i',
@@ -89,12 +88,18 @@ if __name__ == '__main__':
     else:            
         VERBOSITY = args.verbosity
     
-    if args.annot == 1:
+    if args.engine == 1:
+        print('annotator1')
         from lapels import annotator as annotator
-    elif args.annot == 2:
+    elif args.engine == 2:
+        print('annotator2')
         from lapels import annotator2 as annotator
-    elif args.annot == 3:
+    elif args.engine == 3:  
+        print('annotator3')      
         from lapels import annotator3 as annotator
+    elif args.engine == 4:
+        print('annotator4')
+        from lapels import annotator4 as annotator
     
     annotator.VERBOSITY = VERBOSITY
     
@@ -109,7 +114,7 @@ if __name__ == '__main__':
         chroms = mod.chroms
     
     chromAliases = mod.meta.chromAliases
-        
+            
     tagPrefixes = [args.ts, args.ti, args.td]
             
     if args.outBam is None:        
@@ -167,16 +172,11 @@ if __name__ == '__main__':
     
     ## Correct reference lengths in the bam header.
     for chrDict in outHeader['SQ']:
-        sn = chrDict['SN'].upper()
-        try:
-            chrDict['LN'] = refLengths[sn]
-        except KeyError:
-            sn = sn.lstrip('CHR')
-            try:
-                chrDict['LN'] = refLengths[sn]
-            except KeyError:
-                raise ValueError("Unable to find the length of %s in bam." 
-                                 % chrDict['SN'])                            
+        sn = chrDict['SN']
+        chrDict['LN'] = mod.meta.getChromLength(sn)
+        if chrDict['LN'] is None:
+            raise ValueError("Unable to find the length of %s in bam." % 
+                             chrDict['SN'])                            
 
     ##The output bam file will be sorted by position.
     outHeader['HD']['SO'] = 'coordinate'
@@ -229,8 +229,8 @@ if __name__ == '__main__':
         if VERBOSITY > 0:
             log("%d read(s) found\n" % nReads, 1, True)
             
-        a = annotator.Annotator(modChrom, refLengths[chrom], mod, bamIter, 
-                                nReads, tagPrefixes, tmpFile)            
+        a = annotator.Annotator(modChrom, mod.meta.getChromLength(chrom), mod, 
+                                bamIter, nReads, tagPrefixes, tmpFile)            
         count = a.execute()        
         
         if VERBOSITY > 0:

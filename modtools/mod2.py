@@ -50,7 +50,10 @@ class Mod:
         self.fileName = fileName
         self.chroms = self.tabix.contigs
         self.chrom = -1
-        self.meta = metadata.MetaData(self.header['reference'])
+        try:
+            self.meta = metadata.MetaData(self.header['reference'])
+        except KeyError:
+            pass
                         
         
     def load(self, chrom):

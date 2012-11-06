@@ -8,10 +8,12 @@ Created on Sep 20, 2012
 
 import gc
 import pysam
+import gzip
 from modtools import posmap
+from modtools import metadata
 
 
-VERSION = '0.0.3'
+VERSION = '0.1.0'
 
 __all__ = ['Mod', 'VERSION']
 
@@ -19,7 +21,20 @@ class Mod:
     '''The class for parsing a piece of a mod file from the same chromosome.'''
     
     def __init__(self, fileName):
-                
+        fp = gzip.open(fileName, 'rb')
+        self.header = dict()
+        for line in fp:
+            line = line.strip()
+            if len(line) == 0:
+                continue
+            elif line.startswith('#'):
+                tup = line[1:].split('=')
+                assert len(tup) == 2
+                self.header[tup[0]] = tup[1]
+            else:
+                break
+        fp.close()
+#        print(header)
 #        # Compress with bgzip
 #        if not fileName.endswith('.gz'): 
 #            if not os.path.isfile(fileName+'.gz'):
@@ -30,12 +45,12 @@ class Mod:
 #        if not os.path.isfile(fileName+'.tbi'):
 #            pysam.tabix_index(fileName, force=True, seq_col=1, start_col=2, 
 #                              end_col=2, meta_char='#', zerobased=True)
-        
-                
+                        
         self.tabix = pysam.Tabixfile(fileName)
         self.fileName = fileName
         self.chroms = self.tabix.contigs
-        self.chrom = -1   
+        self.chrom = -1
+        self.meta = metadata.MetaData(self.header['reference'])
                         
         
     def load(self, chrom):
@@ -51,7 +66,7 @@ class Mod:
         
         if chrom in self.tabix.contigs:
             gc.disable()
-            append = self.data.append            
+            append = self.data.append
             for line in self.tabix.fetch(reference=chrom):
                 cols = line.split('\t')
                 cols[2] = int(cols[2]) # Convert positions to integers.
@@ -134,7 +149,7 @@ class Mod:
             if i<len(data):
                 varPos = data[i][2]
 
-        #assert refPos <= refLens[chrom]
+#        assert refPos <= refLens[chrom]
         if refPos > chromLen:
             raise ValueError("Variant position %d out of reference boundary"
                              % refPos)
@@ -164,10 +179,13 @@ class Mod:
         gc.enable()
 
 
-    def getPosMap(self, chrom, chromLen):
+    def getPosMap(self, chrom, chromLen = None):
         '''Return a PosMap instance of the current mod instance.'''
         if self.chrom != chrom:
-            self.load(chrom)          
+            self.load(chrom)
+        
+        if chromLen is None:
+            chromLen = self.meta.getChromLength(chrom)
             
         if self.posmap is None:
             self.buildPosMap(chromLen)
@@ -175,19 +193,20 @@ class Mod:
         return self.posmap
 
 
-    def buildSeq(self, fasta, chrom, chromAliases, chromLens):
+    def buildSeq(self, fasta, chrom, fastaChroms):
         '''Build the sequence based on the mod data and reference sequences.'''
         assert chrom == self.chrom
         
         data = self.data        
         assert data is not None
         
-        basicName = chromAliases.getBasicName(chrom)
-        fastaChrom = chromAliases.getMatchedAlias(basicName, chromLens.keys())        
+        meta = self.meta 
+        basicName = meta.chromAliases.getBasicName(chrom)
+        fastaChrom = meta.chromAliases.getMatchedAlias(basicName, fastaChroms)        
         if fastaChrom is None:
             raise ValueError("Chromosome '%s' not found in FASTA. " % chrom +
                              "Possible names: %s. " % 
-                             ','.join(sorted(chromLens.keys())) +
+                             ','.join(sorted(fastaChroms)) +
                              "Chromosome name mapping may be used.\n")
                 
         # If no content in MOD for this chromosome
@@ -197,7 +216,7 @@ class Mod:
         
         gc.disable()        
         
-        chromLen = chromLens[fastaChrom]        
+        chromLen = meta.getChromLength(chrom)       
         nRows = len(data)
         seqs = []
 
@@ -274,13 +293,13 @@ class Mod:
         gc.enable()
 
 
-    def getSeq(self, fasta, chrom, chromAliases, chromLens):
+    def getSeq(self, fasta, chrom, fastaChroms):
         '''Return the sequence of the in silico chromosome'''
         if self.chrom != chrom:
             self.load(chrom)
             
         if self.seq is None:
-            self.buildSeq(fasta, chrom, chromAliases, chromLens)
+            self.buildSeq(fasta, chrom, fastaChroms)
         assert len(self.seq) > 0
         return self.seq
     
@@ -400,4 +419,3 @@ class Mod:
 #        gc.enable()
 #        return ''.join(seqs)
 
-    

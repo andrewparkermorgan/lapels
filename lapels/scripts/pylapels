@@ -49,14 +49,14 @@ if __name__ == '__main__':
                        help='quiet mode')  
     group.add_argument('-v', dest='verbosity', action="store_const", const=2,
                        default=1, help='verbose mode')
-    p.add_argument('-a', metavar='aliasFile', dest='alias', 
-                   type=readableFile, default = None,
-                   help='the file of chromosome name alias definition' +
-                        ' (default: none)')       
+#    p.add_argument('-a', metavar='aliasFile', dest='alias', 
+#                   type=readableFile, default = None,
+#                   help='the file of chromosome name alias definition' +
+#                        ' (default: none)')       
     p.add_argument('-c', metavar='chromList', dest='chroms', 
                    type=validChromList, default = set(),
                    help='a comma-separated list of chromosomes (default: all)')
-    p.add_argument('--annotator', metavar='annot', dest='annot', default='1',
+    p.add_argument('--annotator', metavar='annot', dest='annot', default='3',
                    type=int, help='choose annotator')
     p.add_argument('--ts', metavar='prefix', type=validTagPrefix, default='s',
                    help='tag prefix for numbers of observed SNPs (default: s)')
@@ -83,6 +83,12 @@ if __name__ == '__main__':
 #                   default=sys.stdout, help='the log file (default: stdout)')
     args = p.parse_args()
 
+    
+    if args.quiet:
+        VERBOSITY = 0
+    else:            
+        VERBOSITY = args.verbosity
+    
     if args.annot == 1:
         from lapels import annotator as annotator
     elif args.annot == 2:
@@ -90,11 +96,22 @@ if __name__ == '__main__':
     elif args.annot == 3:
         from lapels import annotator3 as annotator
     
-    if args.quiet:
-        VERBOSITY = 0
-    else:            
-        VERBOSITY = args.verbosity
+    annotator.VERBOSITY = VERBOSITY
     
+    # A compromise: adding complexity but reducing unnecessary argument.
+    if VERBOSITY > 0:
+        log("extracting MOD file ...\n", 1, True)
+    tmpmod = tmpmod.getTabixMod(args.inMod)
+    mod = Mod(tmpmod)
+        
+    chroms = args.chroms    
+    if len(args.chroms) == 0: 
+        chroms = mod.chroms
+    
+    chromAliases = mod.meta.chromAliases
+        
+    tagPrefixes = [args.ts, args.ti, args.td]
+            
     if args.outBam is None:        
         if not args.inBam.endswith('.bam'):
             outFileName = args.inBam + '.annotated.bam'
@@ -103,31 +120,17 @@ if __name__ == '__main__':
     else:
         outFileName = args.outBam
             
-    chroms = args.chroms
-    tagPrefixes = [args.ts, args.ti, args.td]
-        
-    if args.alias is None:        
-        chromAliases = alias.chromAliases
-    else:
-        chromAliases = alias.Alias()
-        chromAliases.readFromFile(args.alias)
-        
-    annotator.VERBOSITY = VERBOSITY
-        
-    # A compromise: adding complexity but reducing unnecessary argument.
-    if VERBOSITY > 0:
-        log("extracting MOD file ...\n", 1, True)
-    tmpmod = tmpmod.getTabixMod(args.inMod)
-    mod = Mod(tmpmod)
-                
+#    if args.alias is None:        
+#        chromAliases = alias.chromAliases
+#    else:
+#        chromAliases = alias.Alias()
+#        chromAliases.readFromFile(args.alias)
+                            
     if VERBOSITY > 0:
         log("input MOD file: %s (%s)\n" % (args.inMod, mod.fileName), 1, True)        
         log("input BAM file: %s\n" % args.inBam, 1, True)         
         log("output BAM file: %s\n" % outFileName, 1, True)
-        
-    if len(args.chroms) == 0: 
-        chroms = mod.chroms
-        
+                
     ## Check if bam index exists.
     if not os.path.isfile(args.inBam+'.bai'):
         if VERBOSITY > 0:
@@ -238,36 +241,36 @@ if __name__ == '__main__':
     tmpFile.close()
     
     
-#    ## Sort by read name, required by fixmate
-#    if VERBOSITY > 0:
-#        log("sorting output by read name\n", 1, True)    
-#    pysam.sort('-n', outPrefix+'.unsorted.tmp.bam', outPrefix+'.sorted.tmp')
-#    os.remove(outPrefix+'.unsorted.tmp.bam')    
-#
-#    ## Fix mates
-#    if VERBOSITY > 0:
-#        log("fixing mate\n", 1, True)    
-#    pysam.fixmate(outPrefix+'.sorted.tmp.bam', outPrefix+'.matefixed.tmp.bam')     
-#    os.remove(outPrefix+'.sorted.tmp.bam')    
-#    
-#    ## Sort by position
-#    if VERBOSITY > 0:
-#        log("sorting output by position\n", 1, True)
-#    pysam.sort(outPrefix+'.matefixed.tmp.bam', outPrefix)    
-#    os.remove(outPrefix+'.matefixed.tmp.bam')
-#    
-#    ## Build the bam index for output    
-#    if VERBOSITY > 0:
-#        log("creating bam index for final output\n", 1, True)
-#    pysam.index(outFileName)
-#    if os.path.isfile(outFileName+'.bai'):    
-#        if VERBOSITY > 0:
-#            log("index created\n", 1, True)
-#    else:
-#        if VERBOSITY > 0:
-#                log("index failed\n", 1, True)
-#        raise IOError("Unable to create the bam index. " + 
-#                      "Make sure the bam file is sorted by coordinate.")            
+    ## Sort by read name, required by fixmate
+    if VERBOSITY > 0:
+        log("sorting output by read name\n", 1, True)    
+    pysam.sort('-n', outPrefix+'.unsorted.tmp.bam', outPrefix+'.sorted.tmp')
+    os.remove(outPrefix+'.unsorted.tmp.bam')    
+
+    ## Fix mates
+    if VERBOSITY > 0:
+        log("fixing mate\n", 1, True)    
+    pysam.fixmate(outPrefix+'.sorted.tmp.bam', outPrefix+'.matefixed.tmp.bam')     
+    os.remove(outPrefix+'.sorted.tmp.bam')    
+    
+    ## Sort by position
+    if VERBOSITY > 0:
+        log("sorting output by position\n", 1, True)
+    pysam.sort(outPrefix+'.matefixed.tmp.bam', outPrefix)    
+    os.remove(outPrefix+'.matefixed.tmp.bam')
+    
+    ## Build the bam index for output    
+    if VERBOSITY > 0:
+        log("creating bam index for final output\n", 1, True)
+    pysam.index(outFileName)
+    if os.path.isfile(outFileName+'.bai'):    
+        if VERBOSITY > 0:
+            log("index created\n", 1, True)
+    else:
+        if VERBOSITY > 0:
+                log("index failed\n", 1, True)
+        raise IOError("Unable to create the bam index. " + 
+                      "Make sure the bam file is sorted by coordinate.")            
 
     os.remove(mod.fileName)
     os.remove(mod.fileName+'.tbi')

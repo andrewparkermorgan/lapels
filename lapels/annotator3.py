@@ -344,7 +344,7 @@ class Annotator:
                     log("tgt reg cigar(%d): %s.\n" 
                         % (idx, cu.toString([rseq.cigar[idx]])))
                 
-                if treg[0] == 0:             
+                if treg[0] == 0:
                     rreg = self.parseTargetRegion(treg, rseq)
                 elif treg[0] == 1:
                     rreg = (1, [rseq.cigar[idx]], rend+1, rend, -1)
@@ -378,7 +378,7 @@ class Annotator:
 #                    rreg = (1, [rseq.cigar[idx]], rend+1, rend, -1)
                 regions.append(rreg)
             
-            #print regions
+            print regions
             assert len(regions) == len(rseq.cigar)
             
 #            print("before")
@@ -396,9 +396,9 @@ class Annotator:
                 elif regions[idx][0] == 3:
                     regions[idx] = (3, None, pend+1, )
             
-#            print("get start")
-#            for reg in regions:
-#                print(reg)
+            print("get start")
+            for reg in regions:
+                print(reg)
                 
             pstart = -1
             for idx in range(nRegions-1, -1, -1):
@@ -417,9 +417,9 @@ class Annotator:
                     else:
                         regions[idx] = (3, [], regions[idx][2], pstart-1, -1)                    
             
-#            print("get end")
-#            for reg in regions:
-#                print(reg)
+            print("get end")
+            for reg in regions:
+                print(reg)
                         
 #            maxIdx = len(regions)
 #            ## I1/M1/(N1,D1)

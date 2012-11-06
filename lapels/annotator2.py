@@ -150,7 +150,7 @@ class Annotator:
             raise NotImplementedError("cannot parse this region.")
                 
         if VERBOSITY > 1:            
-            self.log("T: %d-%d; R: %d-%d\n" %(tstart, tend, rstart, rend))
+            log("T: %d-%d; R: %d-%d\n" %(tstart, tend, rstart, rend))
                         
         # Initialize the new attributes of the region
         nstart = rend + 1   # The ref position of the first M or D.          
@@ -202,8 +202,8 @@ class Annotator:
                 
                 if VERBOSITY > 1:
                     for j in range(startIdx, endIdx):
-                        self.log(','.join(map(str,data[j])))
-                        self.log('\n')
+                        log(','.join(map(str,data[j])))
+                        log('\n')
                 
                 # Handle the sub-regions for each variant position.
                 subRegs=[('m',1)]
@@ -238,9 +238,9 @@ class Annotator:
                             if op != 2 and op != 3: # D_1 or N_1                                                                
                                 rbase = rseq.seq[getReadOffset(rseq, tpos)]                            
                                 if VERBOSITY > 1:                                                        
-                                    self.log("SNP found at %d: %s\n" 
+                                    log("SNP found at %d: %s\n" 
                                              % (tpos, reg[1]))                                
-                                    self.log("Read base: %s\n" % rbase)
+                                    log("Read base: %s\n" % rbase)
                                 if rbase == reg[1][-1]:
                                     nSNPs += 1
                         rpos += 1

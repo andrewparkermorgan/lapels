@@ -15,10 +15,10 @@ import dbutils as dbu
 from modtools.variants import parseVariant, INS, DEL
 from modtools.utils import *
 from modtools import version
-from modtools import alias
+from modtools import metadata
 
 DESC = 'A DB to MOD converter.'
-__version__ = '0.0.3'
+__version__ = '0.1.0'
 VERBOSITY = 1
 
 
@@ -43,10 +43,10 @@ if __name__ == '__main__':
                    type=validChromList, default = [],
                    help='a comma-separated list of chromosomes in output' +
                         ' (default: all)')
-    p.add_argument('-a', metavar='aliasFile', dest='alias', 
-                   type=readableFile, default = None,
-                   help='the file of chromosome name alias definition' +
-                        ' (default: none)')    
+#    p.add_argument('-a', metavar='aliasFile', dest='alias', 
+#                   type=readableFile, default = None,
+#                   help='the file of chromosome name alias definition' +
+#                        ' (default: none)')    
     p.add_argument('-o', metavar='mod', dest='mod', 
                    type=writableFile, default=None, 
                    help='the output mod file'\
@@ -68,16 +68,19 @@ if __name__ == '__main__':
     else:
         modfp = gzip.open(args.mod, 'wb')        
     
-    if args.alias is None:        
-        chromAliases = alias.chromAliases
-    else:
-        chromAliases = alias.Alias()
-        chromAliases.readFromFile(args.alias)
+#    if args.alias is None:        
+#        chromAliases = alias.chromAliases
+#    else:
+#        chromAliases = alias.Alias()
+#        chromAliases.readFromFile(args.alias)
                         
     chroms = args.chroms        
     sample = args.sample
     ref = args.ref    
-    db = args.db    
+    db = args.db
+    
+    meta = metadata.MetaData(ref)
+    chromAliases = meta.chromAliases
     
     if VERBOSITY > 0:
         log("from %s to %s\n" %(ref, sample), 1 ,True)

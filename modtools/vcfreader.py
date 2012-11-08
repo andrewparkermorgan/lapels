@@ -141,7 +141,7 @@ class VCFReader():
             raise ValueError("Header not found.")
         
         # Get the column index of selected samples        
-        headers = line[1:].split(FS)
+        headers = line[1:].rstrip().split(FS)
         self.nColumns = len(headers)        
         if self.nColumns <= 9:
             raise ValueError("Not enough columns in header.")                

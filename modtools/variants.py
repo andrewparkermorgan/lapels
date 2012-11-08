@@ -11,14 +11,14 @@ VARIANT_TYPES=set([DEL,SUB,INS,INV,DUP,TRN])
 
 class Variant:
     def __init__(self, chrom, offset, length, vtype, extra=None):        
-        self.start = (str(chrom), int(offset)) #offset is 0-based.
+        self.start = (str(chrom), int(offset)) #offset is 0-based
         self.length = int(length)
         self.type = vtype
         self.extra = extra
         
     def __str__(self):        
-        return "%s:%d-%d:%s" % (self.start[0], self.start[1], self.start[1]+self.length-1, 
-                                self.type)
+        return "%s:%d-%d:%s" % (self.start[0], self.start[1], 
+                                self.start[1]+self.length-1, self.type)
     
     def ragic(self):
         return "%d%s" %(self.length,self.type)
@@ -29,21 +29,17 @@ class SNP(Variant):
         Variant.__init__(self, chrom, offset, 1, SUB, allele)
 
     def __str__(self):
-        return "%s:%d:%s:%s" % (self.start[0], self.start[1], self.type, self.extra)
+        return "%s:%d:%s:%s" % (self.start[0], self.start[1], self.type, 
+                                self.extra)
 
 
-class Deletion(Variant):
-    ##Comment this.     
-    #def __init__(self, chrom, start, seq):         
-    #    Variant.__init__(self, chrom, start, len(seq), DEL, seq)
-    ##Change extra of a Deletion to be None, so that adjacent deletions can be combined.
-    
+class Deletion(Variant):    
     def __init__(self, chrom, offset, seq):
         Variant.__init__(self, chrom, offset, len(seq), DEL, seq)
         
     def __str__(self):
-        return "%s:%d-%d:%s" % (self.start[0], self.start[1], self.start[1]+self.length-1, 
-                                   self.type)
+        return "%s:%d-%d:%s" % (self.start[0], self.start[1], 
+                                self.start[1]+self.length-1, self.type)
 
     
 class Insertion(Variant):
@@ -51,7 +47,8 @@ class Insertion(Variant):
         Variant.__init__(self, chrom, offset, len(seq), INS, seq)
 
     def __str__(self):
-        return "%s:%d:%s:%s" % (self.start[0], self.start[1], self.type, self.extra)
+        return "%s:%d:%s:%s" % (self.start[0], self.start[1], self.type, 
+                                self.extra)
 
 
 class Inversion(Variant):
@@ -71,6 +68,7 @@ class Translocation:
         self.r2 = Variant(chrom2, offset2, length2)
 
 
+
 def variantFactory(chrom, offset, length, vtype, extra=None):              
 #    if type == MAT:
 #        assert extra == None and length > 0
@@ -84,37 +82,71 @@ def variantFactory(chrom, offset, length, vtype, extra=None):
     if vtype == INS:
         assert length == len(extra) and length > 0
         return Insertion(chrom, offset, extra)
+    raise ValueError("Unknown variant type '%s'" % vtype)
 
-    raise Exception("Unknown variant type.")
+
+
+#def parseVariant(chrom, offset, ref, alt):
+#    if ref == alt:
+#        if len(ref) == 1:
+#            return SNP(chrom, offset, "%s/%s" % (ref,alt))
+#        return None
+#        
+#    refLen = len(ref)
+#    altLen = len(alt)
+#    if refLen == 1 and altLen == 1:
+#        return SNP(chrom, offset, "%s/%s" % (ref,alt))
+#    
+#    left = 0
+#    while left < refLen and left < altLen:
+#        if ref[left] != alt[left]:
+#            break
+#        left += 1
+#    else:
+#        if left == refLen:
+#            return Insertion(chrom, offset+left-1, alt[left:])
+#        else: #left == altLen
+#            #self.assertEqual(str pos,left    
+#            return Deletion(chrom, offset+left, ref[left:])
+#            #return Deletion(chrom, offset+left, len(ref[left:]))
+#    
+#    right = 0
+#    while left <= refLen-1-right and left <= altLen-1-right:
+#        if ref[refLen-1-right] != alt[altLen-1-right]:
+#            break
+#        right += 1
+#    else:
+#        if left > refLen-1-right:
+#            return Insertion(chrom, offset+left-1, alt[left:altLen-right])
+#        else: #left > altLen-1-right
+#            return Deletion(chrom, offset+left, ref[left:refLen-right])
+#            #return Deletion(chrom, offset+left, len(ref[left:refLen-right]))
+#    
+#    if left+right == refLen-1 and left+right == altLen-1:
+#        return SNP(chrom, offset+left, "%s/%s" % (ref[left],alt[left]))
+#    else:
+#        raise ValueError("Cannot parse variant. (ref:%s,alt:%s)" % (ref,alt))
+
 
 
 def parseVariant(chrom, offset, ref, alt):
     if ref == alt:
-        #self.assertEqual(str("%s:%d,%s,%s" %(chrom,offset,ref,alt))
         if len(ref) == 1:
             return SNP(chrom, offset, "%s/%s" % (ref,alt))
         return None
-        
+
     refLen = len(ref)
-    altLen = len(alt)    
-    #self.assertEqual(str(refLen,altLen)
+    altLen = len(alt)
+    
     if refLen == 1 and altLen == 1:
         return SNP(chrom, offset, "%s/%s" % (ref,alt))
     
-    left = 0
-    while left < refLen and left < altLen:
-        if ref[left] != alt[left]:
-            break
-        left += 1
-    else:
-        if left == refLen:
-            return Insertion(chrom, offset+left-1, alt[left:])
-        else: #left == altLen
-            #self.assertEqual(str pos,left    
-            return Deletion(chrom, offset+left, ref[left:])
-            #return Deletion(chrom, offset+left, len(ref[left:]))
-    
+    assert ref[0] ==alt[0]  # The first base of ref and alt should be the same
+            
+    left = 1 # Skip the first position
     right = 0
+    
+    # Match from the right
     while left <= refLen-1-right and left <= altLen-1-right:
         if ref[refLen-1-right] != alt[altLen-1-right]:
             break
@@ -126,9 +158,31 @@ def parseVariant(chrom, offset, ref, alt):
             return Deletion(chrom, offset+left, ref[left:refLen-right])
             #return Deletion(chrom, offset+left, len(ref[left:refLen-right]))
     
+    # Match from the left
+    while left <= refLen-1-right and left <= altLen-1-right:
+        if ref[left] != alt[left]:
+            break
+        left += 1
+    else:
+        if left > refLen-1-right:
+            return Insertion(chrom, offset+left-1, alt[left:altLen-right])
+        else: #left > altLen-1-right        
+            return Deletion(chrom, offset+left, ref[left:refLen-right])
+            #return Deletion(chrom, offset+left, len(ref[left:]))    
+    
     if left+right == refLen-1 and left+right == altLen-1:
         return SNP(chrom, offset+left, "%s/%s" % (ref[left],alt[left]))
     else:
         raise ValueError("Cannot parse variant. (ref:%s,alt:%s)" % (ref,alt))
-        
+    
+    
 
+if __name__ == '__main__':
+    print(parseVariant(8,1,'TACACACACACACACACAAACACACACACACACACAC','TACAC'))
+#    print(parseVariant2(8,1,'TACACACACACACACACAAACACACACACACACACAC','TACAC'))
+#    print(parseVariant(1,100,'ACA','ACCTAA'))
+#    print(parseVariant(1,100,'ACTA','ACTTATA'))
+#    print(parseVariant(1,100,'ACCA','ACCTATA'))
+#    print(parseVariant(1,100,'ATAT','AT'))    
+#    print(parseVariant(1,100,'ATACT','ATA'))
+#    print(parseVariant(1,100,'ATCT','ATTAAT'))

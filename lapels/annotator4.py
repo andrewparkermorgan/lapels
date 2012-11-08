@@ -21,6 +21,7 @@ TESTING = False # For unit test: return the annotated read data once set to 1.
 VERBOSITY = 0   # Print out detail log during the process.
 
 
+
 def getReadOffset(rseq, pos):
     '''
     Given the position in the alignment coordinate, return its offset in read

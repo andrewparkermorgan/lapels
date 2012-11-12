@@ -7,6 +7,7 @@ Created on Nov 5, 2012
 '''
 
 import os
+import tempfile
 import xml.etree.ElementTree as ET
 from modtools import alias
 
@@ -214,8 +215,10 @@ class MetaData:
     
     def load(self, name):
         '''Load a default genome'''
-        open(name+'.xml', 'wb').write(defaultXML[name])                
-        self.loadFromFile(name+'.xml')        
+        # TODO: Remove this temporary file when exit.
+        tmpName = tempfile.mkstemp('.xml')[1]
+        open(tmpName, 'wb').write(defaultXML[name])                
+        self.loadFromFile(tmpName)
     
     
     def loadFromFile(self, fileName):

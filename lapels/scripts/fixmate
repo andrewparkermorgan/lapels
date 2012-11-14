@@ -1,0 +1,64 @@
+#! /bin/env python
+
+'''
+Fix mate information (chromosome, position), insertion size, and read tags (e.g. 
+NH, HI, CP. CC) 
+
+The input bam file should be sorted; othewsie '-s' argument should be used.
+
+Created on Nov 12, 2012
+
+@author: Shunping Huang
+'''
+
+import pysam
+import logging
+import argparse as ap
+from lapels.utils import readableFile, writableFile
+from lapels.matefixer import *
+
+VERSION = '0.0.1'
+DESC = 'Fix mate in a bam file.'
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch = logging.StreamHandler()
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
+                                   
+if __name__ == '__main__':      
+    p = ap.ArgumentParser(description=DESC, 
+                          formatter_class = ap.RawTextHelpFormatter)
+    
+    p.add_argument("-s", dest='sort', action='store_true',
+                       help='call sammtools sort first') 
+    p.add_argument('infile', metavar='in.bam', type=readableFile,
+                   help='the input bam file')    
+    p.add_argument('outfile', metavar='out.bam', nargs = '?', type=writableFile, 
+                   default=None, help='the output bam file'\
+                        +' (default: <in>.matefixed.bam)')
+    args = p.parse_args()
+        
+    if args.sort is True:
+        infile = args.infile.replace('.bam','.sorted')
+        logger.info('sorting %s by name' % args.infile)              
+        pysam.sort('-n', args.infile, infile)
+        infile += '.bam'
+    else:
+        infile = args.infile
+    
+    if args.outfile is None:        
+        outfile = infile.replace('.bam','.matefixed.bam')
+    else:
+        outfile = args.outfile
+    
+    logger.info('input bam: %s', infile)
+    logger.info('output bam: %s', outfile)
+    
+    nTotal, nProcessed = fixmate(infile, outfile)
+            
+    logger.info('total reads: %d', nTotal)
+    logger.info('processed reads: %d', nProcessed)
+    logger.info('All Done!') 

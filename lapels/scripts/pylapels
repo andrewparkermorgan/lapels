@@ -14,6 +14,7 @@ import argparse as ap
 from modtools.mod2 import Mod
 from modtools import tmpmod
 
+from lapels.matefixer import *
 from lapels.utils import *
 #from lapels import annotator2 as annotator
 import lapels.version
@@ -55,8 +56,8 @@ if __name__ == '__main__':
                    type=validChromList, default = set(),
                    help='a comma-separated list of chromosomes (default: all)')
     p.add_argument('--engine', metavar='id', dest='engine', 
-                   type=int, default='4', choices=range(1, 5), 
-                   help='engine id (1-4) (default: 4)')
+                   type=int, default='5', choices=range(1, 6), 
+                   help='engine id (1-5) (default: 5)')
     p.add_argument('--ts', metavar='prefix', type=validTagPrefix, default='s',
                    help='tag prefix for numbers of observed SNPs (default: s)')
     p.add_argument('--ti', metavar='prefix', type=validTagPrefix, default='i',
@@ -100,6 +101,9 @@ if __name__ == '__main__':
     elif args.engine == 4:
         print('annotator4')
         from lapels import annotator4 as annotator
+    elif args.engine == 5:
+        print('annotator5')
+        from lapels import annotator5 as annotator
     
     annotator.VERBOSITY = VERBOSITY
     
@@ -224,7 +228,7 @@ if __name__ == '__main__':
                 log("chromosome alias '%s' used for '%s' in BAM\n" % 
                     (bamChrom, outChrom), 1, True)
             bamIter = inFile.fetch(bamChrom)
-            nReads = nReadsInChroms[bamChrom]        
+            nReads = nReadsInChroms[bamChrom]
             
         if VERBOSITY > 0:
             log("%d read(s) found\n" % nReads, 1, True)
@@ -245,19 +249,20 @@ if __name__ == '__main__':
     if VERBOSITY > 0:
         log("sorting output by read name\n", 1, True)    
     pysam.sort('-n', outPrefix+'.unsorted.tmp.bam', outPrefix+'.sorted.tmp')
-    os.remove(outPrefix+'.unsorted.tmp.bam')    
+#    os.remove(outPrefix+'.unsorted.tmp.bam')    
 
     ## Fix mates
     if VERBOSITY > 0:
         log("fixing mate\n", 1, True)    
-    pysam.fixmate(outPrefix+'.sorted.tmp.bam', outPrefix+'.matefixed.tmp.bam')     
-    os.remove(outPrefix+'.sorted.tmp.bam')    
+    #pysam.fixmate(outPrefix+'.sorted.tmp.bam', outPrefix+'.matefixed.tmp.bam')
+    fixmate(outPrefix+'.sorted.tmp.bam', outPrefix+'.matefixed.tmp.bam')
+#    os.remove(outPrefix+'.sorted.tmp.bam')    
     
     ## Sort by position
     if VERBOSITY > 0:
         log("sorting output by position\n", 1, True)
     pysam.sort(outPrefix+'.matefixed.tmp.bam', outPrefix)    
-    os.remove(outPrefix+'.matefixed.tmp.bam')
+#    os.remove(outPrefix+'.matefixed.tmp.bam')
     
     ## Build the bam index for output    
     if VERBOSITY > 0:

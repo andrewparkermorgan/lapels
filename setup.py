@@ -16,7 +16,7 @@ setup(
     url='http://code.google.com/p/lapels/',    
     license='The MIT License',    
     platforms=['Linux',],    
-    packages = ['lapels', 'lapels.tests', 'modtools', 'modtools.tests'],
+    packages = ['lapels', 'modtools'],
     scripts = ['lapels/scripts/pylapels', 'lapels/scripts/fixmate','modtools/scripts/vcf2mod','modtools/scripts/insilico'],
     install_requires = ['pysam>=0.6b', 'argparse>=1.2'],
     dependency_links = ['http://lapels.googlecode.com/files/pysam-0.6b.tar.gz',],    

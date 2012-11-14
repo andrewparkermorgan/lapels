@@ -29,7 +29,7 @@ import tempfile
 import os
 import pysam
 
-from lapels import annotator2 as annot
+from lapels import annotator4 as annot
 from lapels import cigarutils
 from modtools import mod2
 

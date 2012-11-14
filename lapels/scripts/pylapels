@@ -249,7 +249,7 @@ if __name__ == '__main__':
     if VERBOSITY > 0:
         log("sorting output by read name\n", 1, True)    
     pysam.sort('-n', outPrefix+'.unsorted.tmp.bam', outPrefix+'.sorted.tmp')
-#    os.remove(outPrefix+'.unsorted.tmp.bam')    
+    os.remove(outPrefix+'.unsorted.tmp.bam')    
 
     ## Fix mates
     if VERBOSITY > 0:

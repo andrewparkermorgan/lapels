@@ -17,8 +17,8 @@ class TestCigarBuilder(unittest.TestCase):
         add = regions.append
         add(makeReadRegion(1, '2I', -1, -2))## an inserted I_1 before any M_1    
         add(makeReadRegion(0, '4M', 0, 3))
-        add(makeReadRegion(1, '2I', 4, 3))  ## an inserted I_1 after an M_1
-        add(makeReadRegion(1, '3I', 4, 3))  ## an inserted I_1 after an inserted I_1
+        add(makeReadRegion(1, '2I', -1, -1))  ## an inserted I_1 after an M_1
+        add(makeReadRegion(1, '3I', -1, -1))  ## an inserted I_1 after an inserted I_1
                                             ## a gap
         add(makeReadRegion(1, '1M', 5, 5))  ## a match I_1 after is an inserted I_1
         add(makeReadRegion(1, '4I', 6, 5))  ## an inserted I_1 after a match I_1   
@@ -32,6 +32,7 @@ class TestCigarBuilder(unittest.TestCase):
         add(makeReadRegion(0, '5M', 10, 14))    
         cb = cigarbuilder.CigarBuilder()
         cigar = cb.build(regions)
+        print(cigar)
         self.assertEqual(cigar, [(1, 2), (0, 4), (1, 2), (1, 3), (2, 1), 
                                  (0, 1), (1, 4), (2, 1), (0, 2), (1, 2), 
                                  (1, 3), (1, 4), (1, 5), (2, 1), (0, 5)])

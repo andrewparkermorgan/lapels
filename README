@@ -45,6 +45,12 @@ maintained in Python Standard Library since Python 2.7. It can be found in:
 http://code.google.com/p/argparse/ .
 
 
+* others
+Reads that have multiple alignments are required to have tag HI to specify
+the hit index. Recent aligners (eg. bowtie >= 0.12.8 and tophat >= 1.4.0) will 
+create this tag. It is recommended to use a recent version for read alignment.
+
+
 
 Installation
 ============
@@ -131,4 +137,13 @@ shown below:
     s0 : the number of observed SNP positions having the in silico alleles
     i0 : the number of bases in the observed insertions having in silico alleles
     d0 : the number of bases in the observed deletions having in silico alleles
- 
+
+
+
+Auxiliary Tools
+===============
+    vcf2mod      convert an VCF file into a MOD file
+    insilico     construct the pseudo genome from a MOD file and a reference FASTA file
+    fixmate      fix the mate information (a replacement of samtools fixmate)
+    
+Please refer to their help information (-h) for detail usage.

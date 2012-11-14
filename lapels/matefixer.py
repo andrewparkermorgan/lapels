@@ -13,32 +13,35 @@ logger = logging.getLogger()
 
 MAX_SEGMENTS_PER_HIT = 2
 
+
 def process(reads, rname):
-    '''Process a set of reads with the same read name'''    
-    assert len(reads) > 0     
+    '''Process a set of reads with the same read name'''
+    nReads = len(reads)    
+    assert nReads > 0
+         
     tags = [dict(r.tags) for r in reads]        
     hits = dict()
-    for i in range(len(reads)):       
+    for i in range(nReads):       
         hi = int(tags[i].get('HI',0))
         if hi in hits.keys():
             hits[hi].append(i)
         else:
             hits[hi] = [i]
     
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(reads[0].qname)
-        for k,v in hits.items():
-            logger.debug('%s -> %s' %(k, str(v)))
+#    if logger.isEnabledFor(logging.DEBUG):
+#        logger.debug(reads[0].qname)
+#        for k,v in hits.items():
+#            logger.debug('%s -> %s' %(k, str(v)))
     
     try:
         NH = len(hits)
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug("before:")
-            for i in range(len(reads)):
-                logger.debug(str(reads[i]))
-                logger.debug(reads[i].tlen)
+#        if logger.isEnabledFor(logging.DEBUG):
+#            logger.debug("before:")
+#            for i in range(len(reads)):
+#                logger.debug(str(reads[i]))
+#                logger.debug(reads[i].tlen)
                                         
-        # Update NH, HI, mate chrom and position, and insertion size        
+        # Update NH, HI, mate chrom and position, and insertion size                
         for HI,k in enumerate(sorted(hits.keys())):
             hit = hits[k]
             n = len(hit) # Number of segments in a hit
@@ -51,10 +54,10 @@ def process(reads, rname):
             for j in hit:
                 tag = tags[j]            
                 if NH != tag.get('NH', None):
-                    logger.debug("replacing NH=%d with %d" % (tag['NH'], NH))
+#                    logger.debug("replacing NH=%d with %d" % (tag['NH'], NH))
                     tag['NH'] = NH
                 if HI != tag.get('HI', 0):
-                    logger.debug("replacing NH=%d with %d" % (tag['NH'], NH))
+#                    logger.debug("replacing NH=%d with %d" % (tag['NH'], NH))
                     if NH > 1:
                         tag['HI'] = HI
                     else:
@@ -86,15 +89,15 @@ def process(reads, rname):
         for HI,k in enumerate(sorted(hits.keys())):
             if HI > 0 and HI < NH:
                 for j in hits[k]:
-                    is_read1 = reads[j].is_read1
+                    idx = prev[reads[j].is_read1]                    
                     try:
-                        if reads[prev[is_read1]].tid == reads[j].tid:
-                            tags[prev[is_read1]]['CC'] = '='
+                        if reads[idx].tid == reads[j].tid:
+                            tags[idx]['CC'] = '='
                         else:
-                            tags[prev[is_read1]]['CC'] = rname(reads[j].tid)
+                            tags[idx]['CC'] = rname(reads[j].tid)
                     except KeyError:
                         raise ValueError('No previous read1 or read2 is found')
-                    tags[prev[is_read1]]['CP'] = reads[j].pos + 1 # 1-based CP
+                    tags[idx]['CP'] = reads[j].pos + 1 # 1-based CP
                 prev=dict()
                     
             for j in hits[k]:      
@@ -104,7 +107,7 @@ def process(reads, rname):
                 else:
                     prev[is_read1] = j
                     
-            if HI == NH -1:
+            if HI == NH - 1:
                 for j in hits[k]:
                     if 'CC' in tags[j].keys():
                         del tags[j]['CC']
@@ -112,20 +115,20 @@ def process(reads, rname):
                         del tags[j]['CP']
         
         # Update tags
-        for i in range(len(reads)):
+        for i in range(nReads):
             reads[i].tags = [(k,v) for k,v in tags[i].items()]
             
     except ValueError, err:
         logger.warning('%s : %s', str(err), reads[0].qname)        
         return 0
         
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("after:")
-        for i in range(len(reads)):
-            logger.debug(str(reads[i]))
-            logger.debug(reads[i].tlen)
+#    if logger.isEnabledFor(logging.DEBUG):
+#        logger.debug("after:")
+#        for i in range(len(reads)):
+#            logger.debug(str(reads[i]))
+#            logger.debug(reads[i].tlen)
             
-    return len(reads)
+    return nReads
 
 
 def fixmate(infile, outfile):

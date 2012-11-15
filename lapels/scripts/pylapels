@@ -136,7 +136,7 @@ if __name__ == '__main__':
 #        chromAliases.readFromFile(args.alias)
                             
     if VERBOSITY > 0:
-        log("input MOD file: %s (%s)\n" % (args.inMod, mod.fileName), 1, True)        
+        log("input MOD file: %s (%s)\n" % (args.inMod, mod.fileName), 1, True)
         log("input BAM file: %s\n" % args.inBam, 1, True)         
         log("output BAM file: %s\n" % outFileName, 1, True)
                 
@@ -166,8 +166,8 @@ if __name__ == '__main__':
     
     ## Append a PG tag in the header
     try:    
-        outHeader['PG'] = [{'ID': 'Lapels', 'VN': VERSION, 
-                            'PP': outHeader['PG'][0]['ID'],                              
+        outHeader['PG'] = [{'ID': 'Lapels', 'VN': VERSION,
+                            'PP': outHeader['PG'][0]['ID'],
                             'CL': ' '.join(sys.argv)}] + outHeader['PG']
     except KeyError:
         ## If there is no 'PG' tag, add a new one
@@ -203,7 +203,8 @@ if __name__ == '__main__':
         modChrom = chromAliases.getMatchedAlias(chrom, mod.chroms)
         if modChrom is None:
             if VERBOSITY > 0:
-                log("chromosome alias not found for '%s' in MOD\n" % outChrom, 1, True) 
+                log("chromosome alias not found for '%s' in MOD\n" % 
+                    outChrom, 1, True) 
             modChrom = chrom
         else:
             if VERBOSITY > 0:
@@ -234,7 +235,7 @@ if __name__ == '__main__':
             log("%d read(s) found\n" % nReads, 1, True)
             
         a = annotator.Annotator(modChrom, mod.meta.getChromLength(chrom), mod, 
-                                bamIter, nReads, tagPrefixes, tmpFile)            
+                                bamIter, nReads, tagPrefixes, tmpFile)
         count = a.execute()        
         
         if VERBOSITY > 0:
@@ -275,7 +276,7 @@ if __name__ == '__main__':
         if VERBOSITY > 0:
                 log("index failed\n", 1, True)
         raise IOError("Unable to create the bam index. " + 
-                      "Make sure the bam file is sorted by coordinate.")            
+                      "Make sure the bam file is sorted by coordinate.")
 
     os.remove(mod.fileName)
     os.remove(mod.fileName+'.tbi')

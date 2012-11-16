@@ -137,7 +137,7 @@ def fixmate(infile, outfile):
                            referencenames=inbam.references)
     qname = None    
     nTotal = 0
-    nProcessed = 0
+    nFixed = 0
     count = 0;        
     reads = []    
     gc.disable()    
@@ -151,12 +151,12 @@ def fixmate(infile, outfile):
             if count > 0:
                 for r in reads:
                     outbam.write(r)
-                nProcessed += count                
+                nFixed += count                
             qname = rseq.qname
             del reads
             reads = [rseq]
-        if nTotal % 100000 == 0:        
-            logger.info('%d reads' % nTotal)
+        if nTotal % 200000 == 0:        
+            logger.info('%d read(s) fixed' % nTotal)
             gc.enable()
             gc.disable()
     
@@ -164,8 +164,10 @@ def fixmate(infile, outfile):
     if count > 0:
         for r in reads:
             outbam.write(r)
-        nProcessed += count
-    
+        nFixed += count
+    logger.info('%d read(s) processed' % nTotal)
+    logger.info('%d read(s) fixed and written to file' % nFixed)
+        
     inbam.close()
     outbam.close()
-    return (nTotal, nProcessed)
+    return (nTotal, nFixed)

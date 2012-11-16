@@ -10,6 +10,7 @@ Created on Sep 1, 2012
 
 import bisect
 import re
+import logging
 
 import cigarutils as cu
 import cigarbuilder
@@ -105,7 +106,8 @@ class Annotator:
     '''The class for annotating reads'''
     
     def __init__(self, chrom, chromLen, mod, inBam, nReads=None, 
-                 tagPrefixes=None, outBam = None):            
+                 tagPrefixes=None, outBam = None):
+        self.logger = logging.getLogger('annotator')            
         self.mod = mod
         self.chrom = chrom          #chrom in mod
         self.chromLen = chromLen
@@ -147,7 +149,7 @@ class Annotator:
             return (op,)
                     
         # Find the region's fuzzy boundaries in the reference coordinate.
-        # The position will be imprecise if it falls in an Insertion(I_0).
+        # The position will be imprecise if it falls in an Insertion(I_0).        
         rstart = posmap.bmap((self.chrom, tstart))
         rend = posmap.bmap((self.chrom, tend))
         
@@ -327,7 +329,8 @@ class Annotator:
         
     def execute(self):
         '''The driver method for the module'''
-        
+        self.logger.info("%d read(s) found in BAM", self.nReads)
+                
         self.data = self.mod.data
         self.modKeys = [tup[2] for tup in self.data]            
         self.posmap = self.mod.getPosMap(self.chrom, self.chromLen)        
@@ -338,8 +341,8 @@ class Annotator:
             results = []
         if self.nReads == 0:
             return 0
-        if VERBOSITY > 0 and not TESTING:            
-            log("progress: %3d%%\r" % (count*100/self.nReads), 1, True)
+        if not TESTING:            
+            self.logger.info("progress: %3d%%" % (count*100/self.nReads))
                      
         for rseq in self.inBam:      # Annotate each reads
             if VERBOSITY > 1:       
@@ -593,14 +596,15 @@ class Annotator:
                     (nSNPs, nInsertions, nDeletions))
             count += 1
             
-            if VERBOSITY > 0 and not TESTING:                
-                if count % 10000 == 0:
-                    log("progress: %3d%%\r" % (count*100/self.nReads), 1, True)        
+            if not TESTING and count % 100000 == 0:
+                self.logger.info("progress: %3d%%" % (count*100/self.nReads))        
                 
-        if VERBOSITY > 0 and not TESTING:
-            log("progress: %3d%%\n" % (count*100/self.nReads), 1, True)
+        if not TESTING:
+            self.logger.info("progress: %3d%%" % (count*100/self.nReads))
                                 
         if TESTING:              
             return results
-        log("%d read(s) have variants\n" % count2, 1, True)
+        
+        self.logger.info("%d read(s) written to file", count)
+        self.logger.info("%d read(s) have variants", count2)
         return count

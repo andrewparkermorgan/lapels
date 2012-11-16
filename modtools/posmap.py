@@ -110,7 +110,7 @@ class PosMap:
                     return (refpos[0], s - pos[1])
             else:
                 raise ValueError("Error: In silico position %d overflows." % pos[1])                
-        else:
+        else:            
             raise ValueError("Error: In silico chromosome not found.")
 
 

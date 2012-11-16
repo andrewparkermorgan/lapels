@@ -9,6 +9,7 @@ Created on Sep 20, 2012
 import gc
 import pysam
 import gzip
+import logging
 from modtools import posmap
 from modtools import metadata
 
@@ -21,6 +22,7 @@ class Mod:
     '''The class for parsing a piece of a mod file from the same chromosome.'''
     
     def __init__(self, fileName):
+        self.logger = logging.getLogger('mod')
         fp = gzip.open(fileName, 'rb')
         self.header = dict()
         for line in fp:
@@ -53,21 +55,22 @@ class Mod:
         try:
             self.meta = metadata.MetaData(self.header['reference'])
         except KeyError:
-            pass
-                        
+            pass        
+    
         
     def load(self, chrom):
-        '''Load data from an iterator and do conversion of integer if needed.'''
-#        if chrom not in self.tabix.contigs:
-#            raise ValueError("Chromsome %s not in MOD" % chrom)
+        '''Load data from an iterator and do conversion of integer if needed.'''                    
+        if self.chrom != chrom: # chrom not loaded                                                                                            
+            self.chrom = chrom
+            # Reset posmap, seq, and data
+            self.posmap = None
+            self.seq = None                            
+            self.data = []        
+            
+            if chrom not in self.chroms:                    
+                self.logger.warning("chromosome '%s' not found in MOD", chrom)
+                return
         
-        self.chrom = chrom
-        # Reset posmap and seq
-        self.posmap = None
-        self.seq = None                
-        self.data = []
-        
-        if chrom in self.tabix.contigs:
             gc.disable()
             append = self.data.append
             for line in self.tabix.fetch(reference=chrom):
@@ -76,81 +79,87 @@ class Mod:
                 cols[-1] = cols[-1].rstrip()
                 append(cols)                        
             gc.enable()
+            
+        assert len(self.data) > 0 
+        self.logger.info("%d line(s) found in MOD" % len(self.data))
 
 
     def buildPosMap(self, chromLen):
         '''Build the position mapping instance.'''
         assert self.data is not None
+        self.logger.info("building position map ...")
         gc.disable()
         # Read rows at the same position
         data = self.data
-        chrom = self.chrom
+        chrom = self.chrom        
         nRows = len(data)
         maps = []
 
         # Current position in reference/new genome coordinate
         refPos = 0
         newPos = 0
-        varPos = data[0][2]
-
-        # Rows in data[startIdx:endIdx] have the same position
-        startIdx = 0
-        endIdx = 0
-        for i in range(nRows+1):
-            if i < nRows and data[i][2] == varPos:
-                endIdx+=1
-                continue
-
-            if (refPos > varPos):
-                raise ValueError("Position not in order at line %d" %(i+1))
-            
-            # Fill 'M's in the gap.
-            if refPos < varPos:       
-                maps.append((chrom, refPos, chrom, newPos, varPos-refPos, '+'))
-                newPos += varPos - refPos
-                refPos = varPos
-
-            subSegs=[(1, 'm')]
-            for j in range(startIdx,endIdx):
-                tup = data[j]
-                if tup[0] == 's':
-                    subSegs[0] = (1, 's', tup[3])
-                elif tup[0] == 'i':
-                    subSegs.append((len(tup[3]), 'i', tup[3]))
-                elif tup[0] == 'd':
-                    subSegs[0] = (1, 'd')
-                else:
-                    raise ValueError("Unknown operation %s" % tup[0])
-
-            for seg in subSegs:
-                segLen = seg[0]
-                segType = seg[1]
-                if segType == 'm':
-                    maps.append((chrom, refPos, chrom, newPos, segLen, '+'))
-                    refPos += segLen
-                    newPos += segLen
-                elif segType == 's':
-                    maps.append((chrom, refPos, chrom, newPos, segLen, '+'))
-                    refPos += segLen
-                    newPos += segLen
-                elif segType == 'i':
-                    # Insertion
-                    # Set the ref position to the preceding ref position
-                    maps.append((chrom, -refPos+1, chrom, newPos, segLen, '+'))
-                    newPos += segLen
-                elif segType == 'd':
-                    # Deletion
-                    # Set the new position to the preceding new position
-                    maps.append((chrom, refPos, chrom, -newPos+1, segLen, '+'))
-                    refPos += segLen
-                else:
-                    raise ValueError("Unknown operation %s" % segType)
-
-            startIdx = endIdx
-            endIdx += 1
-
-            if i<len(data):
-                varPos = data[i][2]
+        
+        if len(data) > 0:        
+            varPos = data[0][2]
+    
+            # Rows in data[startIdx:endIdx] have the same position
+            startIdx = 0
+            endIdx = 0
+            for i in range(nRows+1):
+                if i < nRows and data[i][2] == varPos:
+                    endIdx+=1
+                    continue
+    
+                if (refPos > varPos):
+                    raise ValueError("Position not in order at line %d" %(i+1))
+                
+                # Fill 'M's in the gap.
+                if refPos < varPos:       
+                    maps.append((chrom, refPos, chrom, newPos, varPos-refPos, '+'))
+                    newPos += varPos - refPos
+                    refPos = varPos
+    
+                subSegs=[(1, 'm')]
+                for j in range(startIdx,endIdx):
+                    tup = data[j]
+                    if tup[0] == 's':
+                        subSegs[0] = (1, 's', tup[3])
+                    elif tup[0] == 'i':
+                        subSegs.append((len(tup[3]), 'i', tup[3]))
+                    elif tup[0] == 'd':
+                        subSegs[0] = (1, 'd')
+                    else:
+                        raise ValueError("Unknown operation %s" % tup[0])
+    
+                for seg in subSegs:
+                    segLen = seg[0]
+                    segType = seg[1]
+                    if segType == 'm':
+                        maps.append((chrom, refPos, chrom, newPos, segLen, '+'))
+                        refPos += segLen
+                        newPos += segLen
+                    elif segType == 's':
+                        maps.append((chrom, refPos, chrom, newPos, segLen, '+'))
+                        refPos += segLen
+                        newPos += segLen
+                    elif segType == 'i':
+                        # Insertion
+                        # Set the ref position to the preceding ref position
+                        maps.append((chrom, -refPos+1, chrom, newPos, segLen, '+'))
+                        newPos += segLen
+                    elif segType == 'd':
+                        # Deletion
+                        # Set the new position to the preceding new position
+                        maps.append((chrom, refPos, chrom, -newPos+1, segLen, '+'))
+                        refPos += segLen
+                    else:
+                        raise ValueError("Unknown operation %s" % segType)
+    
+                startIdx = endIdx
+                endIdx += 1
+    
+                if i<len(data):
+                    varPos = data[i][2]
 
 #        assert refPos <= refLens[chrom]
         if refPos > chromLen:
@@ -179,11 +188,11 @@ class Mod:
         self.posmap = posmap.PosMap()
         self.posmap.load(compressed, isConverted=True)
 
-        gc.enable()
+        gc.enable()      
 
 
     def getPosMap(self, chrom, chromLen = None):
-        '''Return a PosMap instance of the current mod instance.'''
+        '''Return a PosMap instance of the current mod instance.'''        
         if self.chrom != chrom:
             self.load(chrom)
         

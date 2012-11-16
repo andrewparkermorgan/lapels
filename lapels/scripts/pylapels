@@ -10,20 +10,29 @@ import sys
 import gc
 import pysam
 import argparse as ap
+import logging
 
 from modtools.mod2 import Mod
 from modtools import tmpmod
 
 from lapels.matefixer import *
-from lapels.utils import *
-#from lapels import annotator2 as annotator
+from lapels.utils import readableFile, writableFile, validChromList
+from lapels import annotator5 as annotator
 import lapels.version
 
 
-DESC = 'A remapper and annotator of in silico (pseudo) genome alignments.'
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+formatter = logging.Formatter("[%(asctime)s] %(name)-10s: %(levelname)s: %(message)s",
+                              "%Y-%m-%d %H:%M:%S")
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
+DESC = "A remapper and annotator of in silico (pseudo) genome alignments."
 VERBOSITY = 1
 VERSION = lapels.version.__version__
-
 
 
 def validTagPrefix(s):
@@ -55,9 +64,9 @@ if __name__ == '__main__':
     p.add_argument('-c', metavar='chromList', dest='chroms', 
                    type=validChromList, default = set(),
                    help='a comma-separated list of chromosomes (default: all)')
-    p.add_argument('--engine', metavar='id', dest='engine', 
-                   type=int, default='5', choices=range(1, 6), 
-                   help='engine id (1-5) (default: 5)')
+#    p.add_argument('--engine', metavar='id', dest='engine', 
+#                   type=int, default='5', choices=range(1, 6), 
+#                   help='engine id (1-5) (default: 5)')
     p.add_argument('--ts', metavar='prefix', type=validTagPrefix, default='s',
                    help='tag prefix for numbers of observed SNPs (default: s)')
     p.add_argument('--ti', metavar='prefix', type=validTagPrefix, default='i',
@@ -84,43 +93,40 @@ if __name__ == '__main__':
     args = p.parse_args()
 
     
-    if args.quiet:
-        VERBOSITY = 0
-    else:            
-        VERBOSITY = args.verbosity
+    if args.quiet:                
+        logger.setLevel(logging.CRITICAL)
+    elif args.verbosity == 2:                    
+        logger.setLevel(logging.DEBUG)
     
-    if args.engine == 1:
-        print('annotator1')
-        from lapels import annotator as annotator
-    elif args.engine == 2:
-        print('annotator2')
-        from lapels import annotator2 as annotator
-    elif args.engine == 3:  
-        print('annotator3')      
-        from lapels import annotator3 as annotator
-    elif args.engine == 4:
-        print('annotator4')
-        from lapels import annotator4 as annotator
-    elif args.engine == 5:
-        print('annotator5')
-        from lapels import annotator5 as annotator
+#    if args.engine == 1:
+#        print('annotator1')
+#        from lapels import annotator as annotator
+#    elif args.engine == 2:
+#        print('annotator2')
+#        from lapels import annotator2 as annotator
+#    elif args.engine == 3:  
+#        print('annotator3')      
+#        from lapels import annotator3 as annotator
+#    elif args.engine == 4:
+#        print('annotator4')
+#        from lapels import annotator4 as annotator
+#    elif args.engine == 5:
+#        print('annotator5')
+#        from lapels import annotator5 as annotator
     
     annotator.VERBOSITY = VERBOSITY
-    
-    # A compromise: adding complexity but reducing unnecessary argument.
-    if VERBOSITY > 0:
-        log("extracting MOD file ...\n", 1, True)
-    tmpmod = tmpmod.getTabixMod(args.inMod)
-    mod = Mod(tmpmod)
+            
+    ## Check if bam index exists.
+    if not os.path.isfile(args.inBam+'.bai'):        
+        logger.info("creating index for input BAM file")
+        pysam.index(args.inBam)
+        if os.path.isfile(args.inBam+'.bai'):                
+            logger.info("index created")
+        else:
+            logger.exception("index failed")
+            raise IOError("Failed to create index. " +
+                          "Please make sure the bam file is sorted by position.")
         
-    chroms = args.chroms    
-    if len(args.chroms) == 0: 
-        chroms = mod.chroms
-    
-    chromAliases = mod.meta.chromAliases
-            
-    tagPrefixes = [args.ts, args.ti, args.td]
-            
     if args.outBam is None:        
         if not args.inBam.endswith('.bam'):
             outFileName = args.inBam + '.annotated.bam'
@@ -128,46 +134,36 @@ if __name__ == '__main__':
             outFileName = args.inBam.replace('.bam','.annotated.bam')
     else:
         outFileName = args.outBam
+    
+    tagPrefixes = [args.ts, args.ti, args.td]
+        
+    logger.info("input MOD file: %s", args.inMod)
+    logger.info("input BAM file: %s" % args.inBam)
+    logger.info("output BAM file: %s" % outFileName)
             
-#    if args.alias is None:        
-#        chromAliases = alias.chromAliases
-#    else:
-#        chromAliases = alias.Alias()
-#        chromAliases.readFromFile(args.alias)
-                            
-    if VERBOSITY > 0:
-        log("input MOD file: %s (%s)\n" % (args.inMod, mod.fileName), 1, True)        
-        log("input BAM file: %s\n" % args.inBam, 1, True)         
-        log("output BAM file: %s\n" % outFileName, 1, True)
+    # A compromise: adding complexity but reducing unnecessary argument.    
+    tmpmod = tmpmod.getTabixMod(args.inMod)
+    
+    mod = Mod(tmpmod)
+    chromAliases = mod.meta.chromAliases
+        
+    chroms = args.chroms    
+    if len(args.chroms) == 0: 
+        chroms = mod.chroms
                 
-    ## Check if bam index exists.
-    if not os.path.isfile(args.inBam+'.bai'):
-        if VERBOSITY > 0:
-            log("creating bam index for input\n", 1, True)
-        pysam.index(args.inBam)
-        if os.path.isfile(args.inBam+'.bai'):    
-            if VERBOSITY > 0:
-                log("index created\n", 1, True)
-        else:
-            if VERBOSITY > 0:
-                    log("index failed\n", 1, True)
-            raise IOError("Unable to create the bam index. " + 
-                          "Make sure the bam file is sorted by coordinate.")
-
     ## Get the number of reads in each chromosome
     nReadsInChroms = dict()
     for idxstat in pysam.idxstats(args.inBam):        
         tup = idxstat.rstrip('\n').split('\t')
         nReadsInChroms[tup[0]] = int(tup[2])
-    
             
     inFile = pysam.Samfile(args.inBam, 'rb')
     outHeader = dict(inFile.header.items())
     
     ## Append a PG tag in the header
     try:    
-        outHeader['PG'] = [{'ID': 'Lapels', 'VN': VERSION, 
-                            'PP': outHeader['PG'][0]['ID'],                              
+        outHeader['PG'] = [{'ID': 'Lapels', 'VN': VERSION,
+                            'PP': outHeader['PG'][0]['ID'],
                             'CL': ' '.join(sys.argv)}] + outHeader['PG']
     except KeyError:
         ## If there is no 'PG' tag, add a new one
@@ -187,98 +183,80 @@ if __name__ == '__main__':
 
     #comment = generateComment()
     #outHeader['CO'] = [comment] + outHeader.get('CO',[])    
-        
-    outPrefix = outFileName[:outFileName.rindex('.bam')]
-    tmpFile=pysam.Samfile(outPrefix+'.unsorted.tmp.bam', 'wb', header=outHeader, 
-                          referencenames=inFile.references)
     
-    
-    for outChrom in chroms:
+    mergePool = []
+    outPrefix = outFileName[:outFileName.rindex('.bam')]    
+    for outChrom in chroms:        
         gc.disable()
-        
-        if VERBOSITY > 0:
-            log("processing chromosome '%s'\n" % outChrom, 1, True)         
+                
+        logger.info("processing chromosome '%s'", outChrom)         
         chrom = chromAliases.getBasicName(outChrom)
         
         modChrom = chromAliases.getMatchedAlias(chrom, mod.chroms)
-        if modChrom is None:
-            if VERBOSITY > 0:
-                log("chromosome alias not found for '%s' in MOD\n" % outChrom, 1, True) 
-            modChrom = chrom
-        else:
-            if VERBOSITY > 0:
-                log("chromosome alias '%s' used for '%s' in MOD\n" % 
-                    (modChrom, outChrom), 1, True)      
-        mod.load(modChrom)
-
-        if VERBOSITY > 0:
-            log("%d line(s) found in MOD\n" % len(mod.data), 1, True)
-            if len(mod.data) == 0:
-                log("Warning: chromosome '%s' not found in MOD, " % outChrom + 
-                    "maybe incorrect name or mapping\n" 
-                    , 2, True)
-                
+        if modChrom is None:            
+            logger.info("alias not found for '%s' in MOD", outChrom) 
+            modChrom = str(chrom)
+        else:            
+            logger.info("alias '%s' used for '%s' in MOD", modChrom, outChrom)              
         
+        mod.load(modChrom)                
+                
         bamChrom = chromAliases.getMatchedAlias(chrom, nReadsInChroms.keys())
         if bamChrom is None:
             raise ValueError("Unable to determine the name of '%s' in BAM." 
                              % outChrom)
-        else:
-            if VERBOSITY > 0:
-                log("chromosome alias '%s' used for '%s' in BAM\n" % 
-                    (bamChrom, outChrom), 1, True)
+        else:            
+            logger.info("alias '%s' used for '%s' in BAM", bamChrom, outChrom)
             bamIter = inFile.fetch(bamChrom)
-            nReads = nReadsInChroms[bamChrom]
-            
-        if VERBOSITY > 0:
-            log("%d read(s) found\n" % nReads, 1, True)
-            
-        a = annotator.Annotator(modChrom, mod.meta.getChromLength(chrom), mod, 
-                                bamIter, nReads, tagPrefixes, tmpFile)            
-        count = a.execute()        
+            nReads = nReadsInChroms[bamChrom]                    
         
-        if VERBOSITY > 0:
-            log("%d read(s) written to output\n" % count, 1, True)        
-        gc.enable()        
-    
+        unsortedFileName = "%s.%s.unsorted.bam" % (outPrefix, outChrom)
+        tmpFile=pysam.Samfile(unsortedFileName, 'wb', header=outHeader, 
+                              referencenames=inFile.references)
+                
+        a = annotator.Annotator(modChrom, mod.meta.getChromLength(chrom), mod, 
+                                bamIter, nReads, tagPrefixes, tmpFile)
+        count = a.execute()
+        tmpFile.close()
+        
+        # Sort by read name, required by fixmate
+        logger.info("sorting reads by name ...")
+        sortedFileName = unsortedFileName.replace('unsorted','sorted')        
+        pysam.sort('-n', unsortedFileName, sortedFileName[:-4])
+        os.remove(unsortedFileName)
+        mergePool.append(sortedFileName)            
+        gc.enable()
+            
     inFile.close()
-    tmpFile.close()
+            
+    # Merge
+    logger.info("merging ...")
+    mergeParams = ['-f','-n', outPrefix + '.merged.bam'] + mergePool 
+    pysam.merge(*mergeParams)
+#    for fn in mergePool:
+#        os.remove(fn)
     
-    
-    ## Sort by read name, required by fixmate
-    if VERBOSITY > 0:
-        log("sorting output by read name\n", 1, True)    
-    pysam.sort('-n', outPrefix+'.unsorted.tmp.bam', outPrefix+'.sorted.tmp')
-    os.remove(outPrefix+'.unsorted.tmp.bam')    
-
-    ## Fix mates
-    if VERBOSITY > 0:
-        log("fixing mate\n", 1, True)    
-    #pysam.fixmate(outPrefix+'.sorted.tmp.bam', outPrefix+'.matefixed.tmp.bam')
-    fixmate(outPrefix+'.sorted.tmp.bam', outPrefix+'.matefixed.tmp.bam')
+    # Fix mates
+    logger.info("fixing mate ...")    
+#    pysam.fixmate(outPrefix+'.sorted.tmp.bam', outPrefix+'.matefixed.tmp.bam')
+    fixmate(outPrefix+'.merged.bam', outPrefix+'.matefixed.bam')
 #    os.remove(outPrefix+'.sorted.tmp.bam')    
     
-    ## Sort by position
-    if VERBOSITY > 0:
-        log("sorting output by position\n", 1, True)
-    pysam.sort(outPrefix+'.matefixed.tmp.bam', outPrefix)    
+    # Sort by position
+    logger.info("sorting reads by position ...")
+    pysam.sort(outPrefix+'.matefixed.bam', outPrefix)    
 #    os.remove(outPrefix+'.matefixed.tmp.bam')
     
-    ## Build the bam index for output    
-    if VERBOSITY > 0:
-        log("creating bam index for final output\n", 1, True)
+    # Build index for output    
+    logger.info("creating bam index for final output")
     pysam.index(outFileName)
     if os.path.isfile(outFileName+'.bai'):    
-        if VERBOSITY > 0:
-            log("index created\n", 1, True)
+        logger.info("index created")
     else:
-        if VERBOSITY > 0:
-                log("index failed\n", 1, True)
-        raise IOError("Unable to create the bam index. " + 
-                      "Make sure the bam file is sorted by coordinate.")            
+        logger.warning("index failed")        
 
     os.remove(mod.fileName)
     os.remove(mod.fileName+'.tbi')
     
-    if VERBOSITY > 0:
-        log("All Done!\n", 1, True)
+    logger.info("All Done!")
+    logging.shutdown()

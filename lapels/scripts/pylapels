@@ -58,7 +58,7 @@ def initLogger():
     logger.addHandler(ch)
 
 
-def annotate(bamfile, outChrom, mergePool, lock=None):
+def annotate(bamfile, tmpmod, outChrom, mergePool, lock=None):
     global nReadsInChroms
     global outPrefix
     global outHeader    
@@ -73,6 +73,7 @@ def annotate(bamfile, outChrom, mergePool, lock=None):
     inFile = pysam.Samfile(bamfile, 'rb')             
     chrom = chromAliases.getBasicName(outChrom)
     
+    mod = Mod(tmpmod)
     modChrom = chromAliases.getMatchedAlias(chrom, mod.chroms)
     if modChrom is None:        
         if lock:
@@ -126,7 +127,7 @@ def annotate(bamfile, outChrom, mergePool, lock=None):
     gc.enable()
          
          
-def worker(workerId, bamfile, queue, mergePool, lock):    
+def worker(workerId, bamfile, tmpmod, queue, mergePool, lock):    
     global qidx
     qlen = len(queue)
     while True:
@@ -135,7 +136,7 @@ def worker(workerId, bamfile, queue, mergePool, lock):
         else:
             idx = qidx.value
             qidx.value += 1
-        annotate(bamfile, queue[idx], mergePool, lock)    
+        annotate(bamfile, tmpmod, queue[idx], mergePool, lock)    
 
     
 
@@ -276,7 +277,7 @@ if __name__ == '__main__':
         try:
             for i in range(nProcesses):            
                 p=mp.Process(target=worker, 
-                             args=(i, args.inBam, chroms, mergePool, lock))                                      
+                             args=(i, args.inBam, tmpmod, chroms, mergePool, lock))                                      
                 p.start()    
         except:        
             raise RuntimeError("Cannot use multiple processes.") 
@@ -287,7 +288,7 @@ if __name__ == '__main__':
         logger.info("use a single process")
         mergePool = []
         for outChrom in chroms:
-            annotate(args.inBam, outChrom, mergePool)
+            annotate(args.inBam, tmpmod, outChrom, mergePool)
 
     nMerges = len(mergePool)
     assert nMerges > 0

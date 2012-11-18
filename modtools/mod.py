@@ -72,12 +72,17 @@ class Mod:
                 return
         
             gc.disable()
-            append = self.data.append
+            append = self.data.append            
             for line in self.tabix.fetch(reference=chrom):
-                cols = line.split('\t')
-                cols[2] = int(cols[2]) # Convert positions to integers.
-                cols[-1] = cols[-1].rstrip()
-                append(cols)                        
+                try:
+                    cols = line.split('\t')
+                    cols[2] = int(cols[2]) # Convert positions to integers.
+                    cols[-1] = cols[-1].rstrip()
+                    append(cols)                        
+                except:
+                    print(line)
+                    print(cols)
+                    raise Exception("ERROR!! at line %d" % len(self.data))
             gc.enable()
             
         assert len(self.data) > 0 

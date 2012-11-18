@@ -49,11 +49,7 @@ if __name__ == '__main__':
     p.add_argument('-c', metavar='chromList', dest='chroms', 
                    type=validChromList, default = [],
                    help='a comma-separated list of chromosomes in output' +
-                        ' (default: all)')
-#    p.add_argument('-a', metavar='aliasFile', dest='alias', 
-#                   type=readableFile, default = None,
-#                   help='the file of chromosome name alias definition' +
-#                        ' (default: none)')    
+                        ' (default: all)')  
     p.add_argument('-o', metavar='mod', dest='mod', 
                    type=writableFile, default=None, 
                    help='the output mod file'\
@@ -74,12 +70,6 @@ if __name__ == '__main__':
         modfp = gzip.open(args.sample + '.mod', 'wb')
     else:
         modfp = gzip.open(args.mod, 'wb')        
-    
-#    if args.alias is None:        
-#        chromAliases = alias.chromAliases
-#    else:
-#        chromAliases = alias.Alias()
-#        chromAliases.readFromFile(args.alias)
                         
     chroms = args.chroms        
     sample = args.sample

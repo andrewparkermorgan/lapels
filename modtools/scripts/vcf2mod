@@ -9,28 +9,35 @@ import csv
 import gc
 import argparse as ap
 import gzip
+import logging
 from time import localtime,strftime
 
 from modtools import vcfreader as vcf
 from modtools.variants import parseVariant, SUB, INS, DEL
-from modtools.utils import *
+from modtools.utils import readableFile, writableFile, validChromList
 from modtools import version
 from modtools import metadata
 
 DESC = 'A VCF to MOD converter.'
 __version__ = '0.1.0'
 VERBOSITY = 1
-                
-
-#infiles = ["../../data/indels.chr1_2.vcf.gz", "../../data/snps.chr1_2.vcf.gz"]
-#outfile = "./test.mod"
-#ref = 'mm9'
-#sample = 'A_J'
-#chroms = []
+logger = None
 
 
+def initLogger():
+    global logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter("[%(asctime)s] %(name)-10s: %(levelname)s: %(message)s",
+                                  "%Y-%m-%d %H:%M:%S")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
-if __name__ == '__main__':    
+
+if __name__ == '__main__':   
+    initLogger()
     p = ap.ArgumentParser(description=DESC, 
                           formatter_class = ap.RawTextHelpFormatter)
     # Optional arguments
@@ -43,10 +50,6 @@ if __name__ == '__main__':
                    type=validChromList, default = [],
                    help='a comma-separated list of chromosomes in output' +
                         ' (default: all)')
-#    p.add_argument('-a', metavar='aliasFile', dest='alias', 
-#                   type=readableFile, default = None,
-#                   help='the file of chromosome name alias definition' +
-#                        ' (default: none)')
     p.add_argument('-o', metavar='mod', dest='mod', 
                    type=writableFile, default=None, 
                    help='the output mod file'\
@@ -55,25 +58,19 @@ if __name__ == '__main__':
     p.add_argument('ref', help='reference name')
     p.add_argument('sample', help='requested sample name in VCF')
     p.add_argument('infiles', metavar='vcf', nargs='+', 
-                   type=readableFile, help='input VCF file(s)')                    
+                   type=readableFile, help='input VCF file(s)')
     
     args = p.parse_args()
     
-    if args.quiet:
-        VERBOSITY = 0
-    else:            
-        VERBOSITY = args.verbosity
-        
+    if args.quiet:                
+        logger.setLevel(logging.CRITICAL)
+    elif args.verbosity == 2:                    
+        logger.setLevel(logging.DEBUG)
+                    
     if args.mod is None:                                
         modfp = gzip.open(args.sample + '.mod', 'wb')
     else:
-        modfp = gzip.open(args.mod, 'wb')        
-    
-#    if args.alias is None:        
-#        chromAliases = alias.chromAliases
-#    else:
-#        chromAliases = alias.Alias()
-#        chromAliases.readFromFile(args.alias)
+        modfp = gzip.open(args.mod, 'wb')    
                         
     chroms = args.chroms        
     sample = args.sample
@@ -83,13 +80,11 @@ if __name__ == '__main__':
 
     meta = metadata.MetaData(ref)
     chromAliases = meta.chromAliases
-
-    if VERBOSITY > 0:
-        log("from %s to %s\n" %(ref, sample), 1 ,True)
-        log("input VCF file(s): %s\n" % 
-            ', '.join([infiles[i] for i in range(nFiles)]), 
-            1, True)                
-        log("output MOD file: %s\n" % modfp.name, 1, True)
+    
+    logger.info("from %s to %s", ref, sample)
+    logger.info("input VCF file(s): %s", 
+                ', '.join([infiles[i] for i in range(nFiles)]))                
+    logger.info("output MOD file: %s", modfp.name)
         
     vcfs = [vcf.VCFReader(infiles[i], [sample]) for i in range(nFiles)]            
     
@@ -117,17 +112,15 @@ if __name__ == '__main__':
         for i in range(nFiles): # for each VCF file
             isAliasFound = False
             
-            for alias in aliases: # for each alias
-                if VERBOSITY > 0:
-                    log("try alias '%s' for chromosome '%s'\n" % 
-                        (alias, modChrom), 1, True)
+            for alias in aliases: # for each alias                
+                logger.info("try alias '%s' for chromosome '%s'", 
+                            alias, modChrom)
                 if alias in vcfs[i].chroms:
                     isAliasFound = True
-                    count = 0                        
-                    if VERBOSITY > 0:
-                        log("processing chromosome alias '%s' in %s\n" % 
-                            (alias, vcfs[i].fileName), 1, True)                                                                
-                    for tup in vcfs[i].fetch(alias):                                                                            
+                    count = 0                                            
+                    logger.info("processing chromosome alias '%s' in %s", 
+                                alias, vcfs[i].fileName)
+                    for tup in vcfs[i].fetch(alias):
                         v = parseVariant(modChrom, tup[1], tup[2], tup[3])
                         if v.type == SUB:
                             pool.append(('s', modChrom, v.start[1], v.extra))
@@ -145,32 +138,29 @@ if __name__ == '__main__':
                             raise ValueError("Unknown variant type: %s" % 
                                              v.type)                        
                         count += 1
-                    if VERBOSITY > 0:
-                        log("%d variant(s) found in %s\n" % 
-                            (count, vcfs[i].fileName), 1, True)
-                else:
-                    if VERBOSITY > 0:
-                        log("chromosome alias '%s' not found in %s\n" % 
-                            (alias, vcfs[i].fileName), 1, True)
+                    
+                    logger.info("%d variant(s) found in %s", 
+                                count, vcfs[i].fileName)
+                else:                    
+                    logger.warning("chromosome alias '%s' not found in %s", 
+                                   alias, vcfs[i].fileName)
                         
             if not isAliasFound:
-                if VERBOSITY > 0:
-                    log("Warning: chromosome '%s' not found in %s\n" % 
-                        (modChrom, vcfs[i].fileName), 2, True)
+                logger.warning("chromosome '%s' not found in %s", 
+                               modChrom, vcfs[i].fileName)
                             
         pool=sorted(set(pool), key = lambda tup: tup[2])            
         out.writerows(pool)
-        if VERBOSITY > 0:            
-            log("%d line(s) written to MOD\n" % len(pool), 1, True)
-            if len(pool) > 0:
-                log("SNPs: %d base(s)\n" % nSub, 1, True)
-                log("Insertions: %d base(s)\n" % nIns, 1, True)
-                log("Deletions: %d base(s)\n" % nDel, 1, True)
+                    
+        logger.info("%d line(s) written to MOD", len(pool))
+        if len(pool) > 0:
+            logger.info("SNPs: %d base(s)", nSub)
+            logger.info("Insertions: %d base(s)", nIns)
+            logger.info("Deletions: %d base(s)", nDel)
             
         del pool
         gc.enable()                        
     
     modfp.close()
         
-    if VERBOSITY > 0:
-        log("All Done!\n", 1, True)
+    logger.info("All Done!")

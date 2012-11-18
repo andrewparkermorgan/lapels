@@ -6,8 +6,8 @@ Created on Oct 8, 2012
 @author: Shunping Huang
 '''
 
-import cigarutils
-import regionutils
+#import cigarutils
+#import regionutils
 
 class CigarBuilder():
     def __init__(self):

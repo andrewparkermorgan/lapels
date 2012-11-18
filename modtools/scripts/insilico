@@ -8,20 +8,16 @@ Created on Oct 28, 2012
 import os
 import pysam
 import argparse as ap 
+import logging
 from modtools.mod import Mod
-from modtools.utils import *
+from modtools.utils import readableFile, writableFile, validChromList
 from modtools import tmpmod
 
 from time import localtime,strftime
 
 DESC = 'A FASTA generator for in silico genomes'
 __version__ = '0.1.0'
-
-#modfile = "../../data/C.mod" 
-#infasta = "../../data/ref.chr1_chr10.fa"
-#chroms = ['1','10']
-#outfasta = "out.fa"
-#width = 72
+logger = None
 
 
 def seq2fasta(fp, sample, seq, chrom, width):
@@ -37,8 +33,21 @@ def seq2fasta(fp, sample, seq, chrom, width):
     fp.flush()
 
 
-if __name__ == '__main__':    
-    ## Parse arguments
+def initLogger():
+    global logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter("[%(asctime)s] %(name)-10s: %(levelname)s: %(message)s",
+                                  "%Y-%m-%d %H:%M:%S")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    
+    
+if __name__ == '__main__': 
+    initLogger()   
+    # Parse arguments
     p = ap.ArgumentParser(description=DESC, 
                           formatter_class = ap.RawTextHelpFormatter)
     group = p.add_mutually_exclusive_group()    
@@ -52,10 +61,6 @@ if __name__ == '__main__':
                         ' (default: all)')
 #    p.add_argument('-s', metavar='sample', dest='sample', default=None, 
 #                   help='sample name (default: <mod_prefix>)')
-#    p.add_argument('-a', metavar='aliasFile', dest='alias', 
-#                   type=readableFile, default = None,
-#                   help='the file of chromosome name alias definition' +
-#                        ' (default: none)')
     p.add_argument('-w', metavar='width', dest='width', type=int, default = 72,  
                    help='the width in output FASTA  (default: 72)')    
     p.add_argument('-o', metavar='out.fa', dest='outfasta', type=writableFile, 
@@ -70,13 +75,11 @@ if __name__ == '__main__':
         
     args = p.parse_args()
     
-    if args.quiet:
-        VERBOSITY = 0
-    else:            
-        VERBOSITY = args.verbosity
-    
-    if VERBOSITY > 0:
-        log("extracting MOD file ...\n", 1, True)
+    if args.quiet:                
+        logger.setLevel(logging.CRITICAL)
+    elif args.verbosity == 2:                    
+        logger.setLevel(logging.DEBUG)
+        
     # A compromise: adding complexity but reducing unnecessary argument.
     tmpmod = tmpmod.getTabixMod(args.mod)
     mod = Mod(tmpmod)
@@ -90,11 +93,6 @@ if __name__ == '__main__':
         sample.replace(':','_')
         
     chromAliases = mod.meta.chromAliases
-#    if args.alias is None:        
-#        chromAliases = alias.chromAliases
-#    else:
-#        chromAliases = alias.Alias()
-#        chromAliases.readFromFile(args.alias)
 
     chroms = args.chroms                         
     if len(args.chroms) == 0: 
@@ -112,10 +110,6 @@ if __name__ == '__main__':
         pysam.faidx(args.infasta)            
     
     fp = open(args.infasta+'.fai')
-#    inChromLengths = {}
-#    for line in fp:
-#        tmp = line.rstrip().split('\t')
-#        inChromLengths[tmp[0]] = int(tmp[1])
     inChroms = [line.rstrip().split('\t')[0] for line in fp]
     fp.close()
          
@@ -123,60 +117,54 @@ if __name__ == '__main__':
 
     infasta = pysam.Fastafile(args.infasta)
         
-    if VERBOSITY > 0:                            
-        log("input MOD file: %s (%s)\n" % (args.mod, mod.fileName), 1, True)
-        log("input FASTA file: %s\n" % infasta.filename, 1, True)
-        log("output FASTA file: %s\n" % outfasta.name, 1, True)                
+                                
+    logger.info("input MOD file: %s (%s)", args.mod, mod.fileName)
+    logger.info("input FASTA file: %s", infasta.filename)
+    logger.info("output FASTA file: %s", outfasta.name)                
     
-    for outChrom in chroms:
-        if VERBOSITY > 0:
-            log("processing chromosome '%s'\n" % outChrom, 1, True)         
+    for outChrom in chroms:        
+        logger.info("processing chromosome '%s'", outChrom)         
         chrom = chromAliases.getBasicName(outChrom)
         
         modChrom = chromAliases.getMatchedAlias(chrom, mod.chroms)
-        if modChrom is None:
-            if VERBOSITY > 0:
-                log("chromosome alias not found for '%s' in MOD\n" % outChrom, 1, True) 
+        if modChrom is None:            
+            logger.warning("chromosome alias not found for '%s' in MOD", outChrom) 
             modChrom = chrom
-        else:
-            if VERBOSITY > 0:
-                log("chromosome alias '%s' used for '%s' in MOD\n" % 
-                    (modChrom, outChrom), 1, True)      
+        else:            
+            logger.info("chromosome alias '%s' used for '%s' in MOD", 
+                        modChrom, outChrom)      
         mod.load(modChrom)
         
-        if VERBOSITY > 0:
-            log("%d line(s) found in MOD\n" % len(mod.data), 1, True)
-            if len(mod.data) == 0:
-                log("Warning: chromosome '%s' not found in MOD, " % outChrom + 
-                    "maybe incorrect name or alias\n" 
-                    , 2, True)
+        
+        logger.info("%d line(s) found in MOD", len(mod.data))
+        if len(mod.data) == 0:
+            logger.warning("chromosome '%s' not found in MOD, maybe incorrect name or alias",
+                            outChrom)
                     
 #        posmap=mod.getPosMap(chrom, fastaChromLens[chrom])
 #        print(posmap.toCSV()[:1000])
                 
         inFastaChrom = chromAliases.getMatchedAlias(chrom, inChroms)
-        if inFastaChrom is None:
-            if VERBOSITY > 0:
-                log("chromosome alias not found for '%s' in FASTA\n" % 
-                    outChrom, 1, True)
+        if inFastaChrom is None:            
+            logger.warning("chromosome alias not found for '%s' in FASTA",
+                           outChrom)
             inFastaChrom = chrom
         else:
-            if VERBOSITY > 0:
-                log("chromosome alias '%s' used for '%s' in FASTA\n" % 
-                    (inFastaChrom, outChrom), 1, True)        
+            logger.info("chromosome alias '%s' used for '%s' in FASTA",
+                        inFastaChrom, outChrom)        
                       
         seq=mod.getSeq(infasta, modChrom, inChroms)
-        if VERBOSITY > 0:
-            log("old: %d bp -> new: %d bp\n" % 
-                (mod.meta.getChromLength(inFastaChrom), len(seq)), 
-                1, True)            
+        
+        logger.info("old: %d bp -> new: %d bp", 
+                    mod.meta.getChromLength(inFastaChrom), 
+                    len(seq))                     
                         
         seq2fasta(outfasta, sample, seq, outChrom, width)
         
     outfasta.close()
+    
     # Clean up the temp files
     os.remove(mod.fileName)
     os.remove(mod.fileName+'.tbi')
     
-    if VERBOSITY > 0:
-        log("All Done!\n", 1, True)
+    logger.info("All Done!")

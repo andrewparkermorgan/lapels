@@ -20,15 +20,24 @@ from lapels.matefixer import *
 VERSION = '0.0.2'
 DESC = 'Fix mate in a bam file.'
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch = logging.StreamHandler()
-ch.setFormatter(formatter)
-logger.addHandler(ch)
+logger = None
 
+
+def initLogger():
+    global logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter("[%(asctime)s] %(name)-10s: %(levelname)s: %(message)s",
+                                  "%Y-%m-%d %H:%M:%S")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    
                                    
-if __name__ == '__main__':      
+if __name__ == '__main__':
+    initLogger()      
     p = ap.ArgumentParser(description=DESC, 
                           formatter_class = ap.RawTextHelpFormatter)
     
@@ -43,7 +52,7 @@ if __name__ == '__main__':
         
     if args.sort is True:
         infile = args.infile.replace('.bam','.sorted')
-        logger.info('sorting %s by name', args.infile)              
+        logger.info('sorting %s by names ...', args.infile)              
         pysam.sort('-n', args.infile, infile)
         infile += '.bam'
     else:

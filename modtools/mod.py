@@ -212,15 +212,16 @@ class Mod:
         data = self.data        
         assert data is not None
         
+        self.logger.info("[%s]: building sequence ...", chrom)
+        
         meta = self.meta 
         basicName = meta.chromAliases.getBasicName(chrom)
         fastaChrom = meta.chromAliases.getMatchedAlias(basicName, fastaChroms)        
         if fastaChrom is None:
             raise ValueError("Chromosome '%s' not found in FASTA. " % chrom +
                              "Possible names: %s. " % 
-                             ','.join(sorted(fastaChroms)) +
-                             "Chromosome name mapping may be used.\n")
-                
+                             ','.join(sorted(fastaChroms)))
+        
         # If no content in MOD for this chromosome
         if len(data) == 0:
             self.seq = fasta.fetch(reference=fastaChrom, start=0) 

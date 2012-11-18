@@ -9,28 +9,35 @@ import csv
 import gc
 import argparse as ap
 import gzip
+import logging
 from time import localtime,strftime
 
 import dbutils as dbu
 from modtools.variants import parseVariant, INS, DEL
-from modtools.utils import *
+from modtools.utils import readableFile, writableFile, validChromList
 from modtools import version
 from modtools import metadata
 
 DESC = 'A DB to MOD converter.'
 __version__ = '0.1.0'
 VERBOSITY = 1
+logger = None
 
 
-#dbu.db = "/playpen/data/newgenes.db"
-#outfile = "./test.mod"
-#ref = 'mm9'
-#sample = 'A_J'
-#chroms = []
+def initLogger():
+    global logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter("[%(asctime)s] %(name)-10s: %(levelname)s: %(message)s",
+                                  "%Y-%m-%d %H:%M:%S")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
  
-
 if __name__ == '__main__':
+    initLogger()
     p = ap.ArgumentParser(description=DESC, 
                           formatter_class = ap.RawTextHelpFormatter)
     # Optional arguments
@@ -58,11 +65,11 @@ if __name__ == '__main__':
         
     args = p.parse_args()
     
-    if args.quiet:
-        VERBOSITY = 0
-    else:            
-        VERBOSITY = args.verbosity
-        
+    if args.quiet:                
+        logger.setLevel(logging.CRITICAL)
+    elif args.verbosity == 2:                    
+        logger.setLevel(logging.DEBUG)
+            
     if args.mod is None:                                
         modfp = gzip.open(args.sample + '.mod', 'wb')
     else:
@@ -82,10 +89,9 @@ if __name__ == '__main__':
     meta = metadata.MetaData(ref)
     chromAliases = meta.chromAliases
     
-    if VERBOSITY > 0:
-        log("from %s to %s\n" %(ref, sample), 1 ,True)
-        log("input DB file: %s\n" % db, 1, True)                
-        log("output MOD file: %s\n" % modfp.name, 1, True)
+    logger.info("from %s to %s", ref, sample)
+    logger.info("input DB file: %s", db)                
+    logger.info("output MOD file: %s", modfp.name)
                                 
     if len(chroms) == 0:                    
         chroms = [str(i) for i in range(1,20)] + ['X','Y','M']
@@ -105,9 +111,8 @@ if __name__ == '__main__':
         
         chrom = chromAliases.getBasicName(modChrom)
         
-        if VERBOSITY > 0:
-            log("processing chromosome '%s' in db\n" % 
-                chrom, 1, True)  
+        
+        logger.info("processing chromosome '%s' in db", chrom)  
         
         # Read SNPs        
         snps = dbu.readSNPsFromDB(db, dbu.chromMap[chrom], 
@@ -116,8 +121,8 @@ if __name__ == '__main__':
         for snp in snps: 
             pool.append(('s', modChrom, snp[0], "%s/%s" % (snp[1],snp[2])))
         
-        if VERBOSITY > 0:    
-            log("%d SNP(s) read from DB\n" % nSub, 1, True)
+            
+        logger.info("%d SNP(s) read from DB", nSub)
         del snps
 
         ## Read indels    
@@ -137,22 +142,22 @@ if __name__ == '__main__':
             else:
                 raise ValueError("Unknown variant type: %s" % v.type)
         
-        if VERBOSITY > 0:
-            log("%d indel(s) read from DB\n" % nIndels, 1, True)
+        
+        logger.info("%d indel(s) read from DB", nIndels)
         del indels                    
         
-        pool=sorted(set(pool), key = lambda tup: tup[2])            
+        pool=sorted(set(pool), key = lambda tup: tup[2])                                    
         out.writerows(pool)
-        if VERBOSITY > 0:            
-            log("%d line(s) written to MOD\n" % len(pool), 1, True)
-            log("SNPs: %d base(s)\n" % nSub, 1, True)
-            log("Insertions: %d base(s)\n" % nIns, 1, True)
-            log("Deletions: %d base(s)\n" % nDel, 1, True)
-            
+        
+        logger.info("%d line(s) written to MOD", len(pool))
+        if len(pool) > 0:
+            logger.info("SNPs: %d base(s)", nSub)
+            logger.info("Insertions: %d base(s)", nIns)
+            logger.info("Deletions: %d base(s)", nDel)
+                    
         del pool
         gc.enable()                        
                         
     modfp.close()
     
-    if VERBOSITY > 0:
-        log("All Done!\n", 1, True)
+    logger.info("All Done!")

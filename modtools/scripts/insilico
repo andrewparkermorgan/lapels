@@ -8,7 +8,7 @@ Created on Oct 28, 2012
 import os
 import pysam
 import argparse as ap 
-from modtools.mod2 import Mod
+from modtools.mod import Mod
 from modtools.utils import *
 from modtools import tmpmod
 

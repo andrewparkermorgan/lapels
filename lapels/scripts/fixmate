@@ -43,7 +43,7 @@ if __name__ == '__main__':
         
     if args.sort is True:
         infile = args.infile.replace('.bam','.sorted')
-        logger.info('sorting %s by name' % args.infile)              
+        logger.info('sorting %s by name', args.infile)              
         pysam.sort('-n', args.infile, infile)
         infile += '.bam'
     else:

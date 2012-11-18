@@ -14,12 +14,12 @@ import logging
 import multiprocessing as mp
 import time
 
-from modtools.mod2 import Mod
+from modtools.mod import Mod
 from modtools import tmpmod
 
 from lapels.matefixer import *
 from lapels.utils import readableFile, writableFile, validChromList
-from lapels import annotator5 as annotator
+from lapels import annotator as annotator
 import lapels.version
 
 

@@ -29,9 +29,9 @@ import tempfile
 import os
 import pysam
 
-from lapels import annotator4 as annot
+from lapels import annotator as annot
 from lapels import cigarutils
-from modtools import mod2
+from modtools import mod
 
 
 
@@ -118,7 +118,7 @@ class TestAnnotator(unittest.TestCase):
         modFile.close()
         
         self.chromoID = '1'
-        self.modobj = mod2.Mod(tmpName)
+        self.modobj = mod.Mod(tmpName)
         self.modobj.load(self.chromoID)
         
         for tup in pool:       
@@ -346,7 +346,7 @@ i\t1\t39\tpqrst
         modFile.close()
         
         self.chromoID = '1'
-        self.modobj = mod2.Mod(tmpName)
+        self.modobj = mod.Mod(tmpName)
         self.modobj.load(self.chromoID)
         
         for tup in pool:       

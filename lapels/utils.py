@@ -56,32 +56,5 @@ def writableFile(fileName):
         return fileName
     else:        
         raise ap.ArgumentTypeError("Cannot write file '%s'." % fileName)
-
             
-def buildChromMap(fileName):
-    assert fileName is not None
-    fp = open(fileName, 'r')
-    chromMap = {}
-    if fp is not None:
-        for line in fp:
-            tmp = line.rstrip().split('\t')
-            if tmp[0] in chromMap.keys():
-                raise ValueError("Duplicated keys in chromosome mappings.")
-            else:
-                try:
-                    chromMap[tmp[0]] = tmp[1]
-                except IndexError:
-                    raise ValueError('Mapping format not correct.')
-    fp.close()
-    return chromMap
-
-
-def getOutChrom(chromMap, inChrom, prefix=None):
-    assert chromMap is not None
-    if inChrom in chromMap.keys():
-        return chromMap[inChrom]
-    elif prefix is not None:
-        return prefix + inChrom
-    else:
-        return inChrom
                 

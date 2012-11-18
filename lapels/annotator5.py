@@ -101,13 +101,29 @@ def getTargetRegions(rseq):
     return ret
 
 
+class LoggerWithLock():
+    def __init__(self, name, lock):
+        self.lock = lock
+        self.lock.acquire()
+        self.logger = logging.getLogger(name)
+        self.lock.release()
+    
+    def info(self, msg, *args, **kwargs):
+        self.lock.acquire()        
+        self.logger.info(msg, *args, **kwargs)
+        self.lock.release()
+        
     
 class Annotator:
     '''The class for annotating reads'''
     
     def __init__(self, chrom, chromLen, mod, inBam, nReads=None, 
-                 tagPrefixes=None, outBam = None):
-        self.logger = logging.getLogger('annotator')            
+                 tagPrefixes=None, outBam=None, lock=None):
+        if lock is None:
+            self.logger = logging.getLogger('annotator')
+        else:
+            self.logger = LoggerWithLock('annotator', lock)
+                        
         self.mod = mod
         self.chrom = chrom          #chrom in mod
         self.chromLen = chromLen
@@ -115,8 +131,8 @@ class Annotator:
         self.inBam = inBam
         self.tagPrefixes = tagPrefixes
         self.outBam = outBam
+                
         
-    
     def setTag(self, tags, key, value):
         '''Set read tag'''        
         if key is not None:
@@ -329,7 +345,7 @@ class Annotator:
         
     def execute(self):
         '''The driver method for the module'''
-        self.logger.info("%d read(s) found in BAM", self.nReads)
+        self.logger.info("[%s]: %d read(s) found in BAM", self.chrom, self.nReads)
                 
         self.data = self.mod.data
         self.modKeys = [tup[2] for tup in self.data]            
@@ -342,7 +358,7 @@ class Annotator:
         if self.nReads == 0:
             return 0
         if not TESTING:            
-            self.logger.info("progress: %3d%%" % (count*100/self.nReads))
+            self.logger.info("[%s]: %3d%%", self.chrom, count*100/self.nReads)
                      
         for rseq in self.inBam:      # Annotate each reads
             if VERBOSITY > 1:       
@@ -597,14 +613,13 @@ class Annotator:
             count += 1
             
             if not TESTING and count % 100000 == 0:
-                self.logger.info("progress: %3d%%" % (count*100/self.nReads))        
+                self.logger.info("[%s]: %3d%%", self.chrom, count*100/self.nReads)        
                 
         if not TESTING:
-            self.logger.info("progress: %3d%%" % (count*100/self.nReads))
-                                
-        if TESTING:              
+            self.logger.info("[%s]: %3d%%", self.chrom, count*100/self.nReads)
+            self.logger.info("[%s]: %d read(s) written to file", self.chrom, count)
+            self.logger.info("[%s]: %d read(s) have variants", self.chrom, count2)
+        else:
             return results
         
-        self.logger.info("%d read(s) written to file", count)
-        self.logger.info("%d read(s) have variants", count2)
         return count

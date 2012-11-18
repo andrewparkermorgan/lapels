@@ -86,8 +86,7 @@ class Mod:
 
     def buildPosMap(self, chromLen):
         '''Build the position mapping instance.'''
-        assert self.data is not None
-        self.logger.info("building position map ...")
+        assert self.data is not None        
         gc.disable()
         # Read rows at the same position
         data = self.data
@@ -95,6 +94,7 @@ class Mod:
         nRows = len(data)
         maps = []
 
+        self.logger.info("[%s]: building position map ...", chrom)
         # Current position in reference/new genome coordinate
         refPos = 0
         newPos = 0

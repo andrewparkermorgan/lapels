@@ -1,0 +1,54 @@
+#! /bin/env python 
+'''
+Created on Nov 18, 2012
+
+@author: Shunping Huang
+'''
+
+import modtools.metadata as md
+import gzip
+import sys
+import os.path
+
+if len(sys.argv) != 2:
+    print("Usage: python %s in.mod" % os.path.basename(sys.argv[0]))
+    sys.exit(1)
+    
+inMod = sys.argv[1]
+mod = gzip.open(inMod)
+header = {}
+info = {}
+
+for line in mod:
+    if line.startswith('#'):
+        k,v = line[1:].rstrip().split('=')
+        header[k] = v        
+        continue
+    fields = line.split('\t')
+    fields[-1] = fields[-1].rstrip()
+    assert len(fields) == 4    
+    chromInfo = info.get(fields[1], {})        
+    if fields[0] == 's':
+        chromInfo['s'] = chromInfo.get('s', 0) + 1
+    else:
+        chromInfo[fields[0]] = chromInfo.get(fields[0], 0) + len(fields[3])
+    info[fields[1]] = chromInfo
+
+meta = md.MetaData(header.get('reference',None))
+sample = header.get('sample','unknown')
+#print('chrom,length,nSNPs,nInsertions,nDeletions')
+for chrom in meta.getChromNames():
+    modChrom = meta.getChromAliases().getMatchedAlias(chrom, info.keys())
+    if modChrom == None:
+        ns = 0
+        ni = 0
+        nd = 0
+    else:    
+        chromInfo = info[modChrom]
+        ns = chromInfo.get('s', 0)
+        ni = chromInfo.get('i', 0)
+        nd = chromInfo.get('d', 0)
+    print('%s,%s,%d,%d,%d,%d' %  (sample, chrom, 
+                                  meta.getChromLength(chrom)-nd+ni, ns, ni, nd))
+    
+#print(info)
